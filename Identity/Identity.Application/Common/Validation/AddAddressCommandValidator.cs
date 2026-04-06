@@ -2,8 +2,14 @@ using FluentValidation;
 
 namespace Identity.Application.Users;
 
+/// <summary>
+/// Validates address creation requests.
+/// </summary>
 public sealed class AddAddressCommandValidator : AbstractValidator<AddAddressCommand>
 {
+    /// <summary>
+    /// Initializes the validator rules for <see cref="AddAddressCommand"/>.
+    /// </summary>
     public AddAddressCommandValidator()
     {
         RuleFor(command => command.Street).NotEmpty();

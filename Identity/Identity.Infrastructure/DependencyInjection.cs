@@ -11,8 +11,17 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Identity.Infrastructure;
 
+/// <summary>
+/// Provides dependency injection registration for the Identity infrastructure layer.
+/// </summary>
 public static class DependencyInjection
 {
+    /// <summary>
+    /// Registers Identity persistence, security, authentication, and background services.
+    /// </summary>
+    /// <param name="services">The service collection being configured.</param>
+    /// <param name="configuration">The application configuration source.</param>
+    /// <returns>The updated <see cref="IServiceCollection"/>.</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));

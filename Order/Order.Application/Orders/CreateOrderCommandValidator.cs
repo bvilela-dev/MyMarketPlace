@@ -2,8 +2,14 @@ using FluentValidation;
 
 namespace Order.Application.Orders;
 
+/// <summary>
+/// Validates order creation requests.
+/// </summary>
 public sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrderCommand>
 {
+    /// <summary>
+    /// Initializes the validator rules for <see cref="CreateOrderCommand"/>.
+    /// </summary>
     public CreateOrderCommandValidator()
     {
         RuleFor(command => command.UserId).NotEmpty();

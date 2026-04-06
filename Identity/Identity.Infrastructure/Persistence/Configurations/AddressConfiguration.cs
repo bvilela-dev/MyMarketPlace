@@ -4,8 +4,12 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Identity.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// Configures persistence mapping for <see cref="Address"/>.
+/// </summary>
 public sealed class AddressConfiguration : IEntityTypeConfiguration<Address>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<Address> builder)
     {
         builder.ToTable("addresses");

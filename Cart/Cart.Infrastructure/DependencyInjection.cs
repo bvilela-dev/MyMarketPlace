@@ -6,8 +6,17 @@ using StackExchange.Redis;
 
 namespace Cart.Infrastructure;
 
+/// <summary>
+/// Provides dependency injection registration for the Cart infrastructure layer.
+/// </summary>
 public static class DependencyInjection
 {
+    /// <summary>
+    /// Registers Redis-backed cart infrastructure services.
+    /// </summary>
+    /// <param name="services">The service collection being configured.</param>
+    /// <param name="configuration">The application configuration source.</param>
+    /// <returns>The updated <see cref="IServiceCollection"/>.</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(configuration.GetConnectionString("Redis") ?? "localhost:6379"));

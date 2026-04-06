@@ -4,8 +4,12 @@ using Order.Domain.Entities;
 
 namespace Order.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// Configures persistence mapping for <see cref="OrderItem"/>.
+/// </summary>
 public sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<OrderItem> builder)
     {
         builder.ToTable("order_items");

@@ -5,8 +5,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Identity.Application.Users;
 
+/// <summary>
+/// Adds an address to an existing user.
+/// </summary>
+/// <param name="dbContext">The Identity persistence abstraction.</param>
 public sealed class AddAddressCommandHandler(IIdentityDbContext dbContext) : IRequestHandler<AddAddressCommand, AddressDto>
 {
+    /// <inheritdoc />
     public async Task<AddressDto> Handle(AddAddressCommand request, CancellationToken cancellationToken)
     {
         var user = await dbContext.Users

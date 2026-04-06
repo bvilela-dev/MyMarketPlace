@@ -2,8 +2,14 @@ using FluentValidation;
 
 namespace Identity.Application.Auth;
 
+/// <summary>
+/// Validates user registration requests.
+/// </summary>
 public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUserCommand>
 {
+    /// <summary>
+    /// Initializes the validator rules for <see cref="RegisterUserCommand"/>.
+    /// </summary>
     public RegisterUserCommandValidator()
     {
         RuleFor(command => command.Name).NotEmpty().MaximumLength(120);

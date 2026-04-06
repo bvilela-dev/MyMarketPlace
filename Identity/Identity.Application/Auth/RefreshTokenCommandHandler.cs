@@ -4,8 +4,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Identity.Application.Auth;
 
+/// <summary>
+/// Refreshes expired access tokens using a valid refresh token.
+/// </summary>
+/// <param name="dbContext">The Identity persistence abstraction.</param>
+/// <param name="tokenService">The token generation service.</param>
 public sealed class RefreshTokenCommandHandler(IIdentityDbContext dbContext, ITokenService tokenService) : IRequestHandler<RefreshTokenCommand, AuthResponse>
 {
+    /// <inheritdoc />
     public async Task<AuthResponse> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
     {
         var user = await dbContext.Users

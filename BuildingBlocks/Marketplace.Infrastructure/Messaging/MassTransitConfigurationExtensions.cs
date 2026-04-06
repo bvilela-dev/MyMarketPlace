@@ -4,8 +4,16 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Marketplace.Infrastructure.Messaging;
 
+/// <summary>
+/// Provides shared MassTransit bus configuration for marketplace services.
+/// </summary>
 public static class MassTransitConfigurationExtensions
 {
+    /// <summary>
+    /// Configures the shared RabbitMQ transport, retry policy, circuit breaker, and endpoint conventions.
+    /// </summary>
+    /// <param name="configurator">The MassTransit bus configurator.</param>
+    /// <param name="configuration">The application configuration source.</param>
     public static void ConfigureMarketplaceBus(this IBusRegistrationConfigurator configurator, IConfiguration configuration)
     {
         configurator.SetKebabCaseEndpointNameFormatter();

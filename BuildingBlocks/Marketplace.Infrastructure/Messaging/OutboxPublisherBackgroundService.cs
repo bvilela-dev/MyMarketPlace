@@ -8,11 +8,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Marketplace.Infrastructure.Messaging;
 
+/// <summary>
+/// Periodically publishes pending outbox messages for a DbContext.
+/// </summary>
+/// <typeparam name="TDbContext">The DbContext type that owns the outbox table.</typeparam>
+/// <param name="serviceProvider">The service provider used to create publishing scopes.</param>
+/// <param name="logger">The logger used to record publishing errors.</param>
 public sealed class OutboxPublisherBackgroundService<TDbContext>(
     IServiceProvider serviceProvider,
     ILogger<OutboxPublisherBackgroundService<TDbContext>> logger) : BackgroundService
     where TDbContext : DbContext
 {
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)

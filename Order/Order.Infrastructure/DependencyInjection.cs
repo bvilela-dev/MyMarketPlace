@@ -12,8 +12,17 @@ using Marketplace.Infrastructure.Messaging;
 
 namespace Order.Infrastructure;
 
+/// <summary>
+/// Provides dependency injection registration for the Order infrastructure layer.
+/// </summary>
 public static class DependencyInjection
 {
+    /// <summary>
+    /// Registers persistence, gRPC clients, resilience policies, and outbox processing for Order.
+    /// </summary>
+    /// <param name="services">The service collection being configured.</param>
+    /// <param name="configuration">The application configuration source.</param>
+    /// <returns>The updated <see cref="IServiceCollection"/>.</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<OrderDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Postgres")));

@@ -4,8 +4,16 @@ using MassTransit;
 
 namespace Payment.Application.Consumers;
 
+/// <summary>
+/// Consumes order-created events and simulates payment approval or failure.
+/// </summary>
 public sealed class OrderCreatedConsumer(RedisMessageDeduplicator deduplicator) : IConsumer<OrderCreatedEvent>
 {
+    /// <summary>
+    /// Handles the incoming order-created event.
+    /// </summary>
+    /// <param name="context">The MassTransit consume context.</param>
+    /// <returns>A task representing the asynchronous consume operation.</returns>
     public async Task Consume(ConsumeContext<OrderCreatedEvent> context)
     {
         var messageId = context.MessageId ?? context.Message.EventId;

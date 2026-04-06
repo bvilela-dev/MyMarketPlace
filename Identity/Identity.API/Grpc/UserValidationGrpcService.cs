@@ -4,8 +4,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Identity.API.Grpc;
 
+/// <summary>
+/// Provides gRPC validation of user and address data for downstream services.
+/// </summary>
 public sealed class UserValidationGrpcService(IdentityDbContext dbContext) : UserValidation.UserValidationBase
 {
+    /// <summary>
+    /// Validates that the specified user and address identifiers belong together.
+    /// </summary>
+    /// <param name="request">The validation request payload.</param>
+    /// <param name="context">The gRPC server call context.</param>
+    /// <returns>A response describing whether the user and address are valid.</returns>
     public override async Task<ValidateUserAddressResponse> ValidateUserAddress(ValidateUserAddressRequest request, ServerCallContext context)
     {
         var userId = Guid.Parse(request.UserId);

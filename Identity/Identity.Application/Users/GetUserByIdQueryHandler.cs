@@ -5,8 +5,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Identity.Application.Users;
 
+/// <summary>
+/// Retrieves user profiles by identifier.
+/// </summary>
+/// <param name="dbContext">The Identity persistence abstraction.</param>
 public sealed class GetUserByIdQueryHandler(IIdentityDbContext dbContext) : IRequestHandler<GetUserByIdQuery, UserDto?>
 {
+    /// <inheritdoc />
     public async Task<UserDto?> Handle(GetUserByIdQuery request, CancellationToken cancellationToken)
     {
         var user = await dbContext.Users

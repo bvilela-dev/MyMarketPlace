@@ -8,11 +8,18 @@ using Order.Domain.ValueObjects;
 
 namespace Order.Application.Orders;
 
+/// <summary>
+/// Creates orders after validating the shipping address and current product availability.
+/// </summary>
+/// <param name="dbContext">The order persistence abstraction.</param>
+/// <param name="catalogGrpcClient">The Catalog gRPC client.</param>
+/// <param name="identityGrpcClient">The Identity gRPC client.</param>
 public sealed class CreateOrderCommandHandler(
     IOrderDbContext dbContext,
     ICatalogGrpcClient catalogGrpcClient,
     IIdentityGrpcClient identityGrpcClient) : IRequestHandler<CreateOrderCommand, CreateOrderResponse>
 {
+    /// <inheritdoc />
     public async Task<CreateOrderResponse> Handle(CreateOrderCommand request, CancellationToken cancellationToken)
     {
         if (request.Items.Count == 0)

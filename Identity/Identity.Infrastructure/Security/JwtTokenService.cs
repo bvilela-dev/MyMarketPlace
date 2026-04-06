@@ -10,10 +10,18 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Identity.Infrastructure.Security;
 
+/// <summary>
+/// Generates JWT access tokens and refresh tokens.
+/// </summary>
 public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenService
 {
     private readonly JwtOptions _options = options.Value;
 
+    /// <summary>
+    /// Generates an access token and refresh token pair for a user.
+    /// </summary>
+    /// <param name="user">The authenticated user.</param>
+    /// <returns>The generated token pair.</returns>
     public TokenPair Generate(User user)
     {
         var accessTokenExpiresAt = DateTime.UtcNow.AddMinutes(_options.AccessTokenLifetimeMinutes);
@@ -40,6 +48,10 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
         return new TokenPair(new JwtSecurityTokenHandler().WriteToken(token), accessTokenExpiresAt, GenerateRefreshToken(), refreshTokenExpiresAt);
     }
 
+    /// <summary>
+    /// Generates a cryptographically secure refresh token.
+    /// </summary>
+    /// <returns>The refresh token value.</returns>
     public string GenerateRefreshToken()
     {
         Span<byte> buffer = stackalloc byte[64];

@@ -7,8 +7,17 @@ using StackExchange.Redis;
 
 namespace Catalog.Infrastructure.Services;
 
+/// <summary>
+/// Implements a cache-aside strategy for catalog product reads.
+/// </summary>
 public sealed class CachedProductReadService(CatalogDbContext dbContext, IConnectionMultiplexer redis) : IProductReadService
 {
+    /// <summary>
+    /// Retrieves a product by identifier using Redis as a read-through cache.
+    /// </summary>
+    /// <param name="productId">The product identifier.</param>
+    /// <param name="cancellationToken">The request cancellation token.</param>
+    /// <returns>The product details when found; otherwise, <see langword="null"/>.</returns>
     public async Task<ProductDetailsDto?> GetByIdAsync(Guid productId, CancellationToken cancellationToken = default)
     {
         var database = redis.GetDatabase();

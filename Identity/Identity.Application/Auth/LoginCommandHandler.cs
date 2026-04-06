@@ -5,8 +5,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Identity.Application.Auth;
 
+/// <summary>
+/// Authenticates existing users.
+/// </summary>
+/// <param name="dbContext">The Identity persistence abstraction.</param>
+/// <param name="passwordHasher">The password hashing service.</param>
+/// <param name="tokenService">The token generation service.</param>
 public sealed class LoginCommandHandler(IIdentityDbContext dbContext, IPasswordHasher passwordHasher, ITokenService tokenService) : IRequestHandler<LoginCommand, AuthResponse>
 {
+    /// <inheritdoc />
     public async Task<AuthResponse> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         var user = await dbContext.Users

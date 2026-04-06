@@ -4,8 +4,18 @@ using Order.Application.Abstractions;
 
 namespace Order.Infrastructure.Grpc;
 
+/// <summary>
+/// Implements Identity gRPC calls for the Order service.
+/// </summary>
 public sealed class IdentityGrpcClient(UserValidation.UserValidationClient client) : IIdentityGrpcClient
 {
+    /// <summary>
+    /// Validates the relationship between a user and address through the Identity service.
+    /// </summary>
+    /// <param name="userId">The user identifier.</param>
+    /// <param name="addressId">The address identifier.</param>
+    /// <param name="cancellationToken">The request cancellation token.</param>
+    /// <returns>The validation result.</returns>
     public async Task<UserAddressValidationDto> ValidateUserAddressAsync(Guid userId, Guid addressId, CancellationToken cancellationToken = default)
     {
         var response = await client.ValidateUserAddressAsync(new ValidateUserAddressRequest

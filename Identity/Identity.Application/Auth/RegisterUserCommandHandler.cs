@@ -8,11 +8,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Identity.Application.Auth;
 
+/// <summary>
+/// Creates new users and publishes the corresponding integration event through the outbox.
+/// </summary>
+/// <param name="dbContext">The Identity persistence abstraction.</param>
+/// <param name="passwordHasher">The password hashing service.</param>
+/// <param name="tokenService">The token generation service.</param>
 public sealed class RegisterUserCommandHandler(
     IIdentityDbContext dbContext,
     IPasswordHasher passwordHasher,
     ITokenService tokenService) : IRequestHandler<RegisterUserCommand, AuthResponse>
 {
+    /// <inheritdoc />
     public async Task<AuthResponse> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
         var emailExists = await dbContext.Users.AnyAsync(user => user.Email == request.Email, cancellationToken);
