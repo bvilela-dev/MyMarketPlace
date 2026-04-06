@@ -62,7 +62,8 @@ Distributed marketplace reference system built on .NET 10 and C# 13 with Clean A
 - The gateway routes requests to `identity-api`, `catalog-api`, `cart-api`, and `order-api` using the config in `k8s/apps.yaml`.
 - The current manifests use ClusterIP services, so local access is done with `port-forward`.
 - HPAs in `k8s/apps.yaml` require `metrics-server` in the cluster.
-- The OpenTelemetry endpoint is configured as `otel-collector:4317`, but the collector is not deployed by the current Kubernetes manifests.
+- The OpenTelemetry Collector is deployed by `k8s/platform.yaml` as `otel-collector` and listens on `4317` for OTLP gRPC.
+- The collector also exposes Prometheus-compatible metrics on port `8889` inside the cluster.
 
 ## Notes
 
@@ -132,7 +133,8 @@ Sistema de marketplace distribuído de referência construído com .NET 10 e C# 
 - O gateway encaminha requisições para `identity-api`, `catalog-api`, `cart-api` e `order-api` com a configuração de `k8s/apps.yaml`.
 - Os manifests atuais usam serviços ClusterIP, então o acesso local é feito com `port-forward`.
 - Os HPAs definidos em `k8s/apps.yaml` dependem de `metrics-server` no cluster.
-- O endpoint de OpenTelemetry está configurado como `otel-collector:4317`, mas o collector não está sendo publicado pelos manifests atuais de Kubernetes.
+- O OpenTelemetry Collector é publicado por `k8s/platform.yaml` como `otel-collector` e escuta OTLP gRPC na porta `4317`.
+- O collector também expõe métricas compatíveis com Prometheus na porta `8889` dentro do cluster.
 
 ## Observações
 
