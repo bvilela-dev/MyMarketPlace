@@ -1,0 +1,414 @@
+{
+  "info": {
+    "_postman_id": "e2f94f07-d5b8-4e08-9f49-1c4de1c77b7d",
+    "name": "MyMarketPlace",
+    "description": "Collection para testar todos os endpoints HTTP implementados no MyMarketPlace.\n\nObservacoes:\n- A collection usa endpoints diretos dos servicos e o healthcheck do gateway.\n- Os endpoints protegidos do Identity usam o bearer token salvo automaticamente apos register, login ou refresh.\n- Preencha productId com um GUID valido existente no Catalog quando quiser testar GET product e Create Order com dados reais.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gateway_base_url", "value": "http://localhost:5093" },
+    { "key": "identity_base_url", "value": "http://localhost:5008" },
+    { "key": "catalog_base_url", "value": "http://localhost:5126" },
+    { "key": "cart_base_url", "value": "http://localhost:5279" },
+    { "key": "order_base_url", "value": "http://localhost:5063" },
+    { "key": "payment_base_url", "value": "http://localhost:5067" },
+    { "key": "inventory_base_url", "value": "http://localhost:5101" },
+    { "key": "notification_base_url", "value": "http://localhost:5281" },
+    { "key": "userId", "value": "00000000-0000-0000-0000-000000000000" },
+    { "key": "addressId", "value": "00000000-0000-0000-0000-000000000000" },
+    { "key": "productId", "value": "00000000-0000-0000-0000-000000000000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{accessToken}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Gateway",
+      "item": [
+        {
+          "name": "Health - API Gateway",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_base_url}}/",
+              "host": ["{{gateway_base_url}}"],
+              "path": [""]
+            },
+            "description": "Valida se o API Gateway esta de pe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Identity",
+      "item": [
+        {
+          "name": "Health - Identity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{identity_base_url}}/",
+              "host": ["{{identity_base_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bruno Vilela\",\n  \"email\": \"bruno.vilela+postman@example.com\",\n  \"password\": \"StrongP@ss123\"\n}"
+            },
+            "url": {
+              "raw": "{{identity_base_url}}/api/auth/register",
+              "host": ["{{identity_base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "var json = pm.response.json();",
+                  "if (json.userId) pm.collectionVariables.set('userId', json.userId);",
+                  "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bruno.vilela+postman@example.com\",\n  \"password\": \"StrongP@ss123\"\n}"
+            },
+            "url": {
+              "raw": "{{identity_base_url}}/api/auth/login",
+              "host": ["{{identity_base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "var json = pm.response.json();",
+                  "if (json.userId) pm.collectionVariables.set('userId', json.userId);",
+                  "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{identity_base_url}}/api/auth/refresh",
+              "host": ["{{identity_base_url}}"],
+              "path": ["api", "auth", "refresh"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "var json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get User By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{identity_base_url}}/api/users/{{userId}}",
+              "host": ["{{identity_base_url}}"],
+              "path": ["api", "users", "{{userId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"street\": \"Av. Paulista\",\n  \"number\": \"1000\",\n  \"city\": \"Sao Paulo\",\n  \"state\": \"SP\",\n  \"zipCode\": \"01310-100\",\n  \"country\": \"Brasil\"\n}"
+            },
+            "url": {
+              "raw": "{{identity_base_url}}/api/users/{{userId}}/addresses",
+              "host": ["{{identity_base_url}}"],
+              "path": ["api", "users", "{{userId}}", "addresses"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "var json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('addressId', json.id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Catalog",
+      "item": [
+        {
+          "name": "Health - Catalog",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{catalog_base_url}}/",
+              "host": ["{{catalog_base_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{catalog_base_url}}/api/products/{{productId}}",
+              "host": ["{{catalog_base_url}}"],
+              "path": ["api", "products", "{{productId}}"]
+            },
+            "description": "Requer que {{productId}} exista no Catalog."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Health - Cart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{cart_base_url}}/",
+              "host": ["{{cart_base_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Cart",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"name\": \"Notebook Gamer\",\n      \"unitPrice\": 8999.90,\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{cart_base_url}}/api/carts/{{userId}}",
+              "host": ["{{cart_base_url}}"],
+              "path": ["api", "carts", "{{userId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Cart By User Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{cart_base_url}}/api/carts/{{userId}}",
+              "host": ["{{cart_base_url}}"],
+              "path": ["api", "carts", "{{userId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Order",
+      "item": [
+        {
+          "name": "Health - Order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{order_base_url}}/",
+              "host": ["{{order_base_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"addressId\": \"{{addressId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{order_base_url}}/api/orders",
+              "host": ["{{order_base_url}}"],
+              "path": ["api", "orders"]
+            },
+            "description": "Requer um userId valido, um addressId do Identity e um productId existente no Catalog."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "item": [
+        {
+          "name": "Health - Payment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{payment_base_url}}/",
+              "host": ["{{payment_base_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "Health - Inventory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{inventory_base_url}}/",
+              "host": ["{{inventory_base_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notification",
+      "item": [
+        {
+          "name": "Health - Notification",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{notification_base_url}}/",
+              "host": ["{{notification_base_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
