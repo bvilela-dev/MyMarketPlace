@@ -1,0 +1,168 @@
+version: "3.9"
+
+services:
+  postgres-identity:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: identitydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - identity-postgres:/var/lib/postgresql/data
+
+  postgres-catalog:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: catalogdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - catalog-postgres:/var/lib/postgresql/data
+
+  postgres-order:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: orderdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - order-postgres:/var/lib/postgresql/data
+
+  postgres-inventory:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: inventorydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - inventory-postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7.4
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "8889:8889"
+
+  prometheus:
+    image: prom/prometheus:v3.3.1
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.6.1
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+
+  identity-api:
+    build:
+      context: .
+      dockerfile: Identity/Identity.API/Dockerfile
+    depends_on:
+      - postgres-identity
+      - rabbitmq
+    ports:
+      - "5100:8080"
+
+  catalog-api:
+    build:
+      context: .
+      dockerfile: Catalog/Catalog.API/Dockerfile
+    depends_on:
+      - postgres-catalog
+      - redis
+    ports:
+      - "5200:8080"
+
+  cart-api:
+    build:
+      context: .
+      dockerfile: Cart/Cart.API/Dockerfile
+    depends_on:
+      - redis
+    ports:
+      - "5300:8080"
+
+  order-api:
+    build:
+      context: .
+      dockerfile: Order/Order.API/Dockerfile
+    depends_on:
+      - postgres-order
+      - rabbitmq
+    ports:
+      - "5400:8080"
+
+  payment-api:
+    build:
+      context: .
+      dockerfile: Payment/Payment.API/Dockerfile
+    depends_on:
+      - rabbitmq
+      - redis
+    ports:
+      - "5500:8080"
+
+  inventory-api:
+    build:
+      context: .
+      dockerfile: Inventory/Inventory.API/Dockerfile
+    depends_on:
+      - postgres-inventory
+      - rabbitmq
+      - redis
+    ports:
+      - "5600:8080"
+
+  notification-api:
+    build:
+      context: .
+      dockerfile: Notification/Notification.API/Dockerfile
+    depends_on:
+      - rabbitmq
+      - redis
+    ports:
+      - "5700:8080"
+
+  gateway-api:
+    build:
+      context: .
+      dockerfile: ApiGateway/ApiGateway.API/Dockerfile
+    depends_on:
+      - identity-api
+      - catalog-api
+      - cart-api
+      - order-api
+    ports:
+      - "5000:8080"
+
+volumes:
+  identity-postgres:
+  catalog-postgres:
+  order-postgres:
+  inventory-postgres:

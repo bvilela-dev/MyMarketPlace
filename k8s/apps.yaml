@@ -1,0 +1,618 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: marketplace-config
+  namespace: marketplace
+data:
+  OTLP_ENDPOINT: http://otel-collector:4317
+  ASPNETCORE_URLS: http://+:8080
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: marketplace
+data:
+  ReverseProxy__Clusters__identity-cluster__Destinations__d1__Address: http://identity-api:8080/
+  ReverseProxy__Clusters__catalog-cluster__Destinations__d1__Address: http://catalog-api:8080/
+  ReverseProxy__Clusters__cart-cluster__Destinations__d1__Address: http://cart-api:8080/
+  ReverseProxy__Clusters__order-cluster__Destinations__d1__Address: http://order-api:8080/
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-api
+  namespace: marketplace
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: identity-api
+  template:
+    metadata:
+      labels:
+        app: identity-api
+    spec:
+      containers:
+        - name: identity-api
+          image: mymarketplace/identity-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: ASPNETCORE_URLS
+            - name: OpenTelemetry__OtlpEndpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: OTLP_ENDPOINT
+            - name: ConnectionStrings__Postgres
+              value: Host=postgres-identity;Port=5432;Database=identitydb;Username=postgres;Password=postgres
+            - name: ConnectionStrings__RabbitMq
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: RABBITMQ_CONNECTION
+            - name: Jwt__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: JWT_SECRET
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-api
+  namespace: marketplace
+spec:
+  selector:
+    app: identity-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: identity-api
+  namespace: marketplace
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: identity-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-api
+  namespace: marketplace
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: catalog-api
+  template:
+    metadata:
+      labels:
+        app: catalog-api
+    spec:
+      containers:
+        - name: catalog-api
+          image: mymarketplace/catalog-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: ASPNETCORE_URLS
+            - name: OpenTelemetry__OtlpEndpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: OTLP_ENDPOINT
+            - name: ConnectionStrings__Postgres
+              value: Host=postgres-catalog;Port=5432;Database=catalogdb;Username=postgres;Password=postgres
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: REDIS_CONNECTION
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-api
+  namespace: marketplace
+spec:
+  selector:
+    app: catalog-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: catalog-api
+  namespace: marketplace
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: catalog-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart-api
+  namespace: marketplace
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cart-api
+  template:
+    metadata:
+      labels:
+        app: cart-api
+    spec:
+      containers:
+        - name: cart-api
+          image: mymarketplace/cart-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: ASPNETCORE_URLS
+            - name: OpenTelemetry__OtlpEndpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: OTLP_ENDPOINT
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: REDIS_CONNECTION
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-api
+  namespace: marketplace
+spec:
+  selector:
+    app: cart-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cart-api
+  namespace: marketplace
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cart-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-api
+  namespace: marketplace
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-api
+  template:
+    metadata:
+      labels:
+        app: order-api
+    spec:
+      containers:
+        - name: order-api
+          image: mymarketplace/order-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: ASPNETCORE_URLS
+            - name: OpenTelemetry__OtlpEndpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: OTLP_ENDPOINT
+            - name: ConnectionStrings__Postgres
+              value: Host=postgres-order;Port=5432;Database=orderdb;Username=postgres;Password=postgres
+            - name: ConnectionStrings__RabbitMq
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: RABBITMQ_CONNECTION
+            - name: Grpc__Identity
+              value: http://identity-api:8080
+            - name: Grpc__Catalog
+              value: http://catalog-api:8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-api
+  namespace: marketplace
+spec:
+  selector:
+    app: order-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-api
+  namespace: marketplace
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: order-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: marketplace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      containers:
+        - name: payment-api
+          image: mymarketplace/payment-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: ASPNETCORE_URLS
+            - name: OpenTelemetry__OtlpEndpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: OTLP_ENDPOINT
+            - name: ConnectionStrings__RabbitMq
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: RABBITMQ_CONNECTION
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: REDIS_CONNECTION
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api
+  namespace: marketplace
+spec:
+  selector:
+    app: payment-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-api
+  namespace: marketplace
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-api
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-api
+  namespace: marketplace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-api
+  template:
+    metadata:
+      labels:
+        app: inventory-api
+    spec:
+      containers:
+        - name: inventory-api
+          image: mymarketplace/inventory-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: ASPNETCORE_URLS
+            - name: OpenTelemetry__OtlpEndpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: OTLP_ENDPOINT
+            - name: ConnectionStrings__Postgres
+              value: Host=postgres-inventory;Port=5432;Database=inventorydb;Username=postgres;Password=postgres
+            - name: ConnectionStrings__RabbitMq
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: RABBITMQ_CONNECTION
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: REDIS_CONNECTION
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-api
+  namespace: marketplace
+spec:
+  selector:
+    app: inventory-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: inventory-api
+  namespace: marketplace
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: inventory-api
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-api
+  namespace: marketplace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-api
+  template:
+    metadata:
+      labels:
+        app: notification-api
+    spec:
+      containers:
+        - name: notification-api
+          image: mymarketplace/notification-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: ASPNETCORE_URLS
+            - name: OpenTelemetry__OtlpEndpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: OTLP_ENDPOINT
+            - name: ConnectionStrings__RabbitMq
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: RABBITMQ_CONNECTION
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: marketplace-secrets
+                  key: REDIS_CONNECTION
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-api
+  namespace: marketplace
+spec:
+  selector:
+    app: notification-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notification-api
+  namespace: marketplace
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notification-api
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: marketplace
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: mymarketplace/api-gateway:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: ASPNETCORE_URLS
+            - name: OpenTelemetry__OtlpEndpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: marketplace-config
+                  key: OTLP_ENDPOINT
+            - name: ReverseProxy__Clusters__identity-cluster__Destinations__d1__Address
+              valueFrom:
+                configMapKeyRef:
+                  name: api-gateway-config
+                  key: ReverseProxy__Clusters__identity-cluster__Destinations__d1__Address
+            - name: ReverseProxy__Clusters__catalog-cluster__Destinations__d1__Address
+              valueFrom:
+                configMapKeyRef:
+                  name: api-gateway-config
+                  key: ReverseProxy__Clusters__catalog-cluster__Destinations__d1__Address
+            - name: ReverseProxy__Clusters__cart-cluster__Destinations__d1__Address
+              valueFrom:
+                configMapKeyRef:
+                  name: api-gateway-config
+                  key: ReverseProxy__Clusters__cart-cluster__Destinations__d1__Address
+            - name: ReverseProxy__Clusters__order-cluster__Destinations__d1__Address
+              valueFrom:
+                configMapKeyRef:
+                  name: api-gateway-config
+                  key: ReverseProxy__Clusters__order-cluster__Destinations__d1__Address
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: marketplace
+spec:
+  selector:
+    app: api-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway
+  namespace: marketplace
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
