@@ -1,0 +1,55 @@
+<Solution>
+  <Folder Name="/ApiGateway/">
+    <Project Path="ApiGateway/ApiGateway.API/ApiGateway.API.csproj" />
+    <Project Path="ApiGateway/ApiGateway.Application/ApiGateway.Application.csproj" />
+    <Project Path="ApiGateway/ApiGateway.Domain/ApiGateway.Domain.csproj" />
+    <Project Path="ApiGateway/ApiGateway.Infrastructure/ApiGateway.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/BuildingBlocks/">
+    <Project Path="BuildingBlocks/Marketplace.Contracts/Marketplace.Contracts.csproj" />
+    <Project Path="BuildingBlocks/Marketplace.Infrastructure/Marketplace.Infrastructure.csproj" />
+    <Project Path="BuildingBlocks/Marketplace.SharedKernel/Marketplace.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/Cart/">
+    <Project Path="Cart/Cart.API/Cart.API.csproj" />
+    <Project Path="Cart/Cart.Application/Cart.Application.csproj" />
+    <Project Path="Cart/Cart.Domain/Cart.Domain.csproj" />
+    <Project Path="Cart/Cart.Infrastructure/Cart.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Catalog/">
+    <Project Path="Catalog/Catalog.API/Catalog.API.csproj" />
+    <Project Path="Catalog/Catalog.Application/Catalog.Application.csproj" />
+    <Project Path="Catalog/Catalog.Domain/Catalog.Domain.csproj" />
+    <Project Path="Catalog/Catalog.Infrastructure/Catalog.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Identity/">
+    <Project Path="Identity/Identity.API/Identity.API.csproj" />
+    <Project Path="Identity/Identity.Application/Identity.Application.csproj" />
+    <Project Path="Identity/Identity.Domain/Identity.Domain.csproj" />
+    <Project Path="Identity/Identity.Infrastructure/Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Inventory/">
+    <Project Path="Inventory/Inventory.API/Inventory.API.csproj" />
+    <Project Path="Inventory/Inventory.Application/Inventory.Application.csproj" />
+    <Project Path="Inventory/Inventory.Domain/Inventory.Domain.csproj" />
+    <Project Path="Inventory/Inventory.Infrastructure/Inventory.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Notification/">
+    <Project Path="Notification/Notification.API/Notification.API.csproj" />
+    <Project Path="Notification/Notification.Application/Notification.Application.csproj" />
+    <Project Path="Notification/Notification.Domain/Notification.Domain.csproj" />
+    <Project Path="Notification/Notification.Infrastructure/Notification.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Order/">
+    <Project Path="Order/Order.API/Order.API.csproj" />
+    <Project Path="Order/Order.Application/Order.Application.csproj" />
+    <Project Path="Order/Order.Domain/Order.Domain.csproj" />
+    <Project Path="Order/Order.Infrastructure/Order.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Payment/">
+    <Project Path="Payment/Payment.API/Payment.API.csproj" />
+    <Project Path="Payment/Payment.Application/Payment.Application.csproj" />
+    <Project Path="Payment/Payment.Domain/Payment.Domain.csproj" />
+    <Project Path="Payment/Payment.Infrastructure/Payment.Infrastructure.csproj" />
+  </Folder>
+</Solution>

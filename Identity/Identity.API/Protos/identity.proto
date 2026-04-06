@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+option csharp_namespace = "Identity.API.Grpc";
+
+package identity;
+
+service UserValidation {
+  rpc ValidateUserAddress (ValidateUserAddressRequest) returns (ValidateUserAddressResponse);
+}
+
+message ValidateUserAddressRequest {
+  string user_id = 1;
+  string address_id = 2;
+}
+
+message ValidateUserAddressResponse {
+  bool is_valid = 1;
+  string user_id = 2;
+  string address_id = 3;
+  string street = 4;
+  string number = 5;
+  string city = 6;
+  string state = 7;
+  string zip_code = 8;
+  string country = 9;
+}

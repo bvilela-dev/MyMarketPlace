@@ -1,0 +1,16 @@
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/Marketplace.Infrastructure.csproj.AssemblyReference.cache
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/Marketplace.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/Marketplace.Infrastructure.AssemblyInfoInputs.cache
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/Marketplace.Infrastructure.AssemblyInfo.cs
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/Marketplace.Infrastructure.csproj.CoreCompileInputs.cache
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/Marketplace.Infrastructure.sourcelink.json
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/bin/Debug/net10.0/Marketplace.Infrastructure.deps.json
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/bin/Debug/net10.0/Marketplace.Infrastructure.dll
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/bin/Debug/net10.0/Marketplace.Infrastructure.pdb
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/bin/Debug/net10.0/Marketplace.SharedKernel.dll
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/bin/Debug/net10.0/Marketplace.SharedKernel.pdb
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/Marketpl.6F2D58E5.Up2Date
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/Marketplace.Infrastructure.dll
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/refint/Marketplace.Infrastructure.dll
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/Marketplace.Infrastructure.pdb
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Infrastructure/obj/Debug/net10.0/ref/Marketplace.Infrastructure.dll

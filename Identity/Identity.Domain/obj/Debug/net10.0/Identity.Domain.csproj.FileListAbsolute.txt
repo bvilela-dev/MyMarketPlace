@@ -1,0 +1,16 @@
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/bin/Debug/net10.0/Identity.Domain.deps.json
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/bin/Debug/net10.0/Identity.Domain.dll
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/bin/Debug/net10.0/Identity.Domain.pdb
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/bin/Debug/net10.0/Marketplace.SharedKernel.dll
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/bin/Debug/net10.0/Marketplace.SharedKernel.pdb
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/Identity.Domain.csproj.AssemblyReference.cache
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/Identity.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/Identity.Domain.AssemblyInfoInputs.cache
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/Identity.Domain.AssemblyInfo.cs
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/Identity.Domain.csproj.CoreCompileInputs.cache
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/Identity.Domain.sourcelink.json
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/Identity.AFA9DB19.Up2Date
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/Identity.Domain.dll
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/refint/Identity.Domain.dll
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/Identity.Domain.pdb
+/home/bruno/Projects/portfolio/MarketPlace/Identity/Identity.Domain/obj/Debug/net10.0/ref/Identity.Domain.dll

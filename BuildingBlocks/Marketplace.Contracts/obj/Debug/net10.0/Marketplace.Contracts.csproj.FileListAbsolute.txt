@@ -1,0 +1,12 @@
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/bin/Debug/net10.0/Marketplace.Contracts.deps.json
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/bin/Debug/net10.0/Marketplace.Contracts.dll
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/bin/Debug/net10.0/Marketplace.Contracts.pdb
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/obj/Debug/net10.0/Marketplace.Contracts.GeneratedMSBuildEditorConfig.editorconfig
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/obj/Debug/net10.0/Marketplace.Contracts.AssemblyInfoInputs.cache
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/obj/Debug/net10.0/Marketplace.Contracts.AssemblyInfo.cs
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/obj/Debug/net10.0/Marketplace.Contracts.csproj.CoreCompileInputs.cache
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/obj/Debug/net10.0/Marketplace.Contracts.sourcelink.json
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/obj/Debug/net10.0/Marketplace.Contracts.dll
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/obj/Debug/net10.0/refint/Marketplace.Contracts.dll
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/obj/Debug/net10.0/Marketplace.Contracts.pdb
+/home/bruno/Projects/portfolio/MarketPlace/BuildingBlocks/Marketplace.Contracts/obj/Debug/net10.0/ref/Marketplace.Contracts.dll
