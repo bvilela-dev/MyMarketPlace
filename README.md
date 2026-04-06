@@ -25,6 +25,18 @@ Distributed marketplace reference system built on .NET 10 and C# 13 with Clean A
 
 ## Run With Kubernetes (k3s)
 
+Fast path:
+
+- `./start.sh`
+
+This script builds the images, imports them into k3s, applies the manifests, waits for the deployments, and opens the gateway on `http://localhost:5000`.
+
+To tear the environment down:
+
+- `./stop.sh`
+
+Manual flow:
+
 1. Start your k3s cluster and confirm access:
 	- `sudo k3s kubectl get nodes`
 2. Build the service images with the names expected by the manifests:
@@ -95,6 +107,18 @@ Sistema de marketplace distribuído de referência construído com .NET 10 e C# 
 3. Execute cada projeto API individualmente ou use os builds de contêiner definidos em `docker-compose.yml`
 
 ## Execução com Kubernetes (k3s)
+
+Fluxo rápido:
+
+- `./start.sh`
+
+Esse script gera as imagens, importa tudo para o k3s, aplica os manifests, aguarda os deployments e expõe o gateway em `http://localhost:5000`.
+
+Para derrubar o ambiente:
+
+- `./stop.sh`
+
+Fluxo manual:
 
 1. Inicie o cluster k3s e confirme o acesso:
 	- `sudo k3s kubectl get nodes`
