@@ -3,25 +3,41 @@ using MediatR;
 namespace Order.Application.Orders;
 
 /// <summary>
-/// Represents the request to create a new order.
+/// Comando de criacao de pedido.
 /// </summary>
-/// <param name="UserId">The ordering user identifier.</param>
-/// <param name="AddressId">The selected address identifier.</param>
-/// <param name="Items">The requested order items.</param>
-public sealed record CreateOrderCommand(Guid UserId, Guid AddressId, IReadOnlyCollection<CreateOrderItemRequest> Items) : IRequest<CreateOrderResponse>;
+/// <remarks>
+/// <b>Correcao de seguranca:</b> o <paramref name="UserId"/> e preenchido pelo
+/// controller a partir da claim <c>sub</c> do token — nunca pelo corpo da requisicao.
+/// Antes, o cliente enviava o comando inteiro e podia criar pedidos em nome de qualquer
+/// usuario, bastando trocar o GUID no JSON.
+/// </remarks>
+/// <param name="UserId">Usuario autenticado (vem do token).</param>
+/// <param name="AddressId">Endereco de entrega escolhido, pertencente ao usuario.</param>
+/// <param name="Items">Itens solicitados.</param>
+public sealed record CreateOrderCommand(Guid UserId, Guid AddressId, IReadOnlyCollection<CreateOrderItemRequest> Items)
+    : IRequest<CreateOrderResponse>;
 
 /// <summary>
-/// Represents an individual line item in an order creation request.
+/// Linha solicitada num pedido.
 /// </summary>
-/// <param name="ProductId">The product identifier.</param>
-/// <param name="Quantity">The requested quantity.</param>
+/// <remarks>
+/// Repare que <b>nao existe campo de preco</b>. O preco vem do Catalog, no servidor.
+/// Aceita-lo do cliente permitiria comprar qualquer produto por um centavo.
+/// </remarks>
+/// <param name="ProductId">Produto desejado.</param>
+/// <param name="Quantity">Quantidade desejada.</param>
 public sealed record CreateOrderItemRequest(Guid ProductId, int Quantity);
 
 /// <summary>
-/// Represents the result returned after an order is created.
+/// Resposta da criacao de pedido.
 /// </summary>
-/// <param name="OrderId">The created order identifier.</param>
-/// <param name="UserId">The ordering user identifier.</param>
-/// <param name="Total">The calculated order total.</param>
-/// <param name="Status">The initial order status.</param>
-public sealed record CreateOrderResponse(Guid OrderId, Guid UserId, decimal Total, string Status);
+/// <param name="OrderId">Identificador do pedido criado.</param>
+/// <param name="UserId">Usuario dono do pedido.</param>
+/// <param name="Total">Valor total calculado pelo servidor.</param>
+/// <param name="Currency">Moeda do total.</param>
+/// <param name="Status">
+/// Estado inicial, sempre <c>PendingPayment</c>. O status evolui de forma assincrona —
+/// consulte <c>GET /api/orders/{id}</c> para acompanhar.
+/// </param>
+/// <param name="CreatedAtUtc">Momento (UTC) da criacao.</param>
+public sealed record CreateOrderResponse(Guid OrderId, Guid UserId, decimal Total, string Currency, string Status, DateTime CreatedAtUtc);

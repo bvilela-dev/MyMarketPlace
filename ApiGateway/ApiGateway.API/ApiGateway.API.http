@@ -1,6 +1,39 @@
-@ApiGateway.API_HostAddress = http://localhost:5093
+### API Gateway — porta unica de entrada.
+### Todas as rotas dos servicos ficam acessiveis com um prefixo.
 
-GET {{ApiGateway.API_HostAddress}}/weatherforecast/
-Accept: application/json
+@host = http://localhost:5000
 
-###
+### Mapa de rotas
+GET {{host}}/
+
+### Catalogo (publico)
+GET {{host}}/catalog/api/products?pageSize=5
+
+### Cadastro
+# @name cadastrar
+POST {{host}}/identity/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Bruno Demo",
+  "email": "gateway.demo@teste.com",
+  "password": "senha-forte-123"
+}
+
+@accessToken = {{cadastrar.response.body.accessToken}}
+@userId = {{cadastrar.response.body.userId}}
+
+### Perfil pelo gateway
+GET {{host}}/identity/api/users/me
+Authorization: Bearer {{accessToken}}
+
+### Carrinho pelo gateway
+GET {{host}}/cart/api/carts/me
+Authorization: Bearer {{accessToken}}
+
+### Pedidos pelo gateway
+GET {{host}}/order/api/orders
+Authorization: Bearer {{accessToken}}
+
+### Saude do proprio gateway
+GET {{host}}/health/live

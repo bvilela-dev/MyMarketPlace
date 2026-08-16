@@ -4,7 +4,7 @@ using MediatR;
 namespace Cart.Application.Queries;
 
 /// <summary>
-/// Represents the request to retrieve a cart by user identifier.
+/// Consulta o carrinho de um usuario.
 /// </summary>
-/// <param name="UserId">The user identifier.</param>
+/// <param name="UserId">Usuario autenticado.</param>
 public sealed record GetCartQuery(Guid UserId) : IRequest<ShoppingCart?>;

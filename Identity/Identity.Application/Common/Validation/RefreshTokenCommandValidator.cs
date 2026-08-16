@@ -3,15 +3,16 @@ using FluentValidation;
 namespace Identity.Application.Auth;
 
 /// <summary>
-/// Validates refresh token requests.
+/// Regras de validacao da renovacao de token.
 /// </summary>
 public sealed class RefreshTokenCommandValidator : AbstractValidator<RefreshTokenCommand>
 {
     /// <summary>
-    /// Initializes the validator rules for <see cref="RefreshTokenCommand"/>.
+    /// Define as regras de <see cref="RefreshTokenCommand"/>.
     /// </summary>
     public RefreshTokenCommandValidator()
     {
-        RuleFor(command => command.RefreshToken).NotEmpty();
+        RuleFor(command => command.RefreshToken)
+            .NotEmpty().WithMessage("O refresh token e obrigatorio.");
     }
 }

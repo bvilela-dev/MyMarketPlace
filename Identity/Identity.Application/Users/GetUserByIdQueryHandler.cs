@@ -6,25 +6,41 @@ using Microsoft.EntityFrameworkCore;
 namespace Identity.Application.Users;
 
 /// <summary>
-/// Retrieves user profiles by identifier.
+/// Busca o perfil de um usuario pelo identificador.
 /// </summary>
-/// <param name="dbContext">The Identity persistence abstraction.</param>
+/// <remarks>
+/// <para>
+/// Consulta de leitura pura, com duas otimizacoes que valem para toda query do projeto:
+/// </para>
+/// <list type="bullet">
+///   <item><c>AsNoTracking()</c> — dispensa o change tracker do EF Core. Como nada sera
+///   alterado, rastrear as entidades so gastaria memoria e CPU.</item>
+///   <item>projecao direta para DTO com <c>Select</c> — o SQL gerado traz apenas as
+///   colunas usadas, em vez de <c>SELECT *</c> seguido de mapeamento em memoria.</item>
+/// </list>
+/// </remarks>
+/// <param name="dbContext">Contrato de persistencia do Identity.</param>
 public sealed class GetUserByIdQueryHandler(IIdentityDbContext dbContext) : IRequestHandler<GetUserByIdQuery, UserDto?>
 {
     /// <inheritdoc />
-    public async Task<UserDto?> Handle(GetUserByIdQuery request, CancellationToken cancellationToken)
-    {
-        var user = await dbContext.Users
-            .Include(candidate => candidate.Addresses)
-            .FirstOrDefaultAsync(candidate => candidate.Id == request.UserId, cancellationToken);
-
-        return user is null
-            ? null
-            : new UserDto(
+    public Task<UserDto?> Handle(GetUserByIdQuery request, CancellationToken cancellationToken)
+        => dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.Id == request.UserId)
+            .Select(user => new UserDto(
                 user.Id,
                 user.Name,
                 user.Email,
-                user.CreatedAt,
-                user.Addresses.Select(address => new AddressDto(address.Id, address.Street, address.Number, address.City, address.State, address.ZipCode, address.Country)).ToArray());
-    }
+                user.CreatedAtUtc,
+                user.Addresses
+                    .Select(address => new AddressDto(
+                        address.Id,
+                        address.Street,
+                        address.Number,
+                        address.City,
+                        address.State,
+                        address.ZipCode,
+                        address.Country))
+                    .ToList()))
+            .FirstOrDefaultAsync(cancellationToken);
 }

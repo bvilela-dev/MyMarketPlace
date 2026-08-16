@@ -1,11 +1,21 @@
 namespace Marketplace.Contracts.Events;
 
 /// <summary>
-/// Notifies consumers that a payment attempt failed.
+/// A tentativa de pagamento de um pedido falhou.
 /// </summary>
-/// <param name="EventId">The unique identifier of the integration event.</param>
-/// <param name="OrderId">The order identifier.</param>
-/// <param name="UserId">The user associated with the payment attempt.</param>
-/// <param name="Reason">The failure reason.</param>
-/// <param name="FailedAtUtc">The UTC timestamp of failure.</param>
+/// <remarks>
+/// Publicado pelo <b>Payment</b>; consumido pelo <b>Order</b> (que move o pedido para
+/// <c>PaymentFailed</c>) e pelo <b>Notification</b> (que avisa o cliente).
+/// <para>
+/// Este e o caminho de compensacao mais simples da coreografia: como nada havia sido
+/// reservado ainda, basta marcar o pedido. Ja uma falha depois da reserva de estoque
+/// exigiria uma <i>transacao compensatoria</i> devolvendo as unidades — ver
+/// <see cref="StockReservationFailedEvent"/>.
+/// </para>
+/// </remarks>
+/// <param name="EventId">Identificador unico desta ocorrencia.</param>
+/// <param name="OrderId">Pedido afetado.</param>
+/// <param name="UserId">Usuario dono do pedido.</param>
+/// <param name="Reason">Motivo legivel da recusa.</param>
+/// <param name="FailedAtUtc">Momento (UTC) da falha.</param>
 public sealed record PaymentFailedEvent(Guid EventId, Guid OrderId, Guid UserId, string Reason, DateTime FailedAtUtc);

@@ -1,58 +1,60 @@
-using System.Text;
 using Identity.Application.Abstractions;
 using Identity.Infrastructure.Persistence;
 using Identity.Infrastructure.Security;
 using Marketplace.Infrastructure.Messaging;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Identity.Infrastructure;
 
 /// <summary>
-/// Provides dependency injection registration for the Identity infrastructure layer.
+/// Registro dos servicos de infraestrutura do Identity.
 /// </summary>
 public static class DependencyInjection
 {
     /// <summary>
-    /// Registers Identity persistence, security, authentication, and background services.
+    /// Registra persistencia, seguranca e o publicador de outbox do Identity.
     /// </summary>
-    /// <param name="services">The service collection being configured.</param>
-    /// <param name="configuration">The application configuration source.</param>
-    /// <returns>The updated <see cref="IServiceCollection"/>.</returns>
+    /// <remarks>
+    /// <para>
+    /// <b>Sobre os tempos de vida escolhidos:</b>
+    /// </para>
+    /// <list type="bullet">
+    ///   <item><c>DbContext</c> — <b>Scoped</b> (um por requisicao). Ele nao e
+    ///   thread-safe e mantem o change tracker; compartilhar entre requisicoes
+    ///   causaria corrupcao de estado.</item>
+    ///   <item><c>IPasswordHasher</c> e <c>ITokenService</c> — sem estado, poderiam ser
+    ///   Singleton. Ficam Scoped por consistencia e porque o custo e irrelevante.</item>
+    ///   <item><c>OutboxPublisherBackgroundService</c> — <b>Singleton</b> (todo
+    ///   <c>IHostedService</c> e). Por isso ele abre um escopo proprio a cada ciclo para
+    ///   resolver o DbContext.</item>
+    /// </list>
+    /// <para>
+    /// <b>A autenticacao JWT nao e registrada aqui</b>: fica em
+    /// <c>AddMarketplaceJwtAuthentication</c>, chamada no <c>Program.cs</c>, para que
+    /// Identity, Cart e Order compartilhem exatamente a mesma configuracao de validacao.
+    /// </para>
+    /// </remarks>
+    /// <param name="services">Container de servicos.</param>
+    /// <param name="configuration">Fonte de configuracao.</param>
+    /// <returns>O proprio <see cref="IServiceCollection"/>.</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
-
         services.AddDbContext<IdentityDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("Postgres")));
+            options.UseNpgsql(
+                configuration.GetConnectionString("Postgres"),
+                npgsql => npgsql.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(10),
+                    errorCodesToAdd: null)));
 
         services.AddScoped<IIdentityDbContext>(provider => provider.GetRequiredService<IdentityDbContext>());
-        services.AddScoped<IIdentityDbContextAdapter>(provider => provider.GetRequiredService<IdentityDbContext>());
-
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
 
-        var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
-            {
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtOptions.Issuer,
-                    ValidAudience = jwtOptions.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret))
-                };
-            });
-
-        services.AddAuthorization();
         services.AddHostedService<OutboxPublisherBackgroundService<IdentityDbContext>>();
+
         return services;
     }
 }

@@ -3,16 +3,16 @@ using Marketplace.Contracts.Grpc;
 namespace Order.Application.Abstractions;
 
 /// <summary>
-/// Defines Identity gRPC operations required by the Order service.
+/// Operacoes do Identity necessarias ao Order.
 /// </summary>
 public interface IIdentityGrpcClient
 {
     /// <summary>
-    /// Validates that the specified user and address identifiers are valid.
+    /// Verifica se o endereco informado pertence ao usuario informado.
     /// </summary>
-    /// <param name="userId">The user identifier.</param>
-    /// <param name="addressId">The address identifier.</param>
-    /// <param name="cancellationToken">The request cancellation token.</param>
-    /// <returns>The validation result.</returns>
+    /// <param name="userId">Usuario autenticado.</param>
+    /// <param name="addressId">Endereco de entrega escolhido.</param>
+    /// <param name="cancellationToken">Token de cancelamento da requisicao.</param>
+    /// <returns>Resultado da validacao, com os dados do endereco quando valido.</returns>
     Task<UserAddressValidationDto> ValidateUserAddressAsync(Guid userId, Guid addressId, CancellationToken cancellationToken = default);
 }

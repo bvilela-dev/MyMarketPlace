@@ -4,7 +4,7 @@ using MediatR;
 namespace Catalog.Application.Products;
 
 /// <summary>
-/// Represents the request to retrieve a catalog product by identifier.
+/// Consulta um produto pelo identificador.
 /// </summary>
-/// <param name="ProductId">The product identifier.</param>
+/// <param name="ProductId">Identificador do produto.</param>
 public sealed record GetProductByIdQuery(Guid ProductId) : IRequest<ProductDetailsDto?>;

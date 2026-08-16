@@ -5,9 +5,9 @@ using MediatR;
 namespace Cart.Application.Queries;
 
 /// <summary>
-/// Handles cart retrieval queries.
+/// Busca o carrinho de um usuario.
 /// </summary>
-/// <param name="cartStore">The cart persistence abstraction.</param>
+/// <param name="cartStore">Armazenamento do carrinho.</param>
 public sealed class GetCartQueryHandler(ICartStore cartStore) : IRequestHandler<GetCartQuery, ShoppingCart?>
 {
     /// <inheritdoc />

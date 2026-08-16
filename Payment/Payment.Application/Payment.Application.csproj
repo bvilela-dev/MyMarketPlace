@@ -1,10 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!--
+    Camada de aplicacao do Payment: o consumidor que decide o pagamento.
+
+    Nao existe projeto Payment.Domain. O servico nao tem entidade nem invariante
+    propria nesta versao — criar uma camada vazia so para manter a simetria visual
+    com os outros servicos seria cerimonia sem conteudo. Quando houver uma entidade
+    Transaction de verdade, o projeto nasce junto com ela.
+  -->
 
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\Marketplace.Contracts\Marketplace.Contracts.csproj" />

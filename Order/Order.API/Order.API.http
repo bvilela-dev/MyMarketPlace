@@ -1,6 +1,70 @@
-@Order.API_HostAddress = http://localhost:5063
+### Order API — criacao de pedidos e acompanhamento do saga.
+### Obtenha token, addressId e productId nos outros arquivos .http.
 
-GET {{Order.API_HostAddress}}/weatherforecast/
-Accept: application/json
+@host = http://localhost:5400
+@accessToken = COLE_O_TOKEN_AQUI
+@addressId = COLE_O_ADDRESS_ID_AQUI
+@productId = COLE_O_PRODUCT_ID_AQUI
 
-###
+### 1. Criar pedido
+### Repare no que NAO vai no corpo: userId (vem do token) e preco (vem do Catalog via gRPC).
+# @name criar
+POST {{host}}/api/orders
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "addressId": "{{addressId}}",
+  "items": [
+    { "productId": "{{productId}}", "quantity": 2 }
+  ]
+}
+
+@orderId = {{criar.response.body.orderId}}
+
+### 2. Consultar o pedido — RODE ALGUMAS VEZES.
+### O status caminha sozinho conforme os eventos sao processados:
+###   PendingPayment -> Paid (PaymentApproved) -> Confirmed (StockReserved)
+GET {{host}}/api/orders/{{orderId}}
+Authorization: Bearer {{accessToken}}
+
+### 3. Listar meus pedidos
+GET {{host}}/api/orders?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### 4. Pedido sem itens -> 400 (barrado no validador)
+POST {{host}}/api/orders
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "addressId": "{{addressId}}",
+  "items": []
+}
+
+### 5. Produto inexistente -> 404
+POST {{host}}/api/orders
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "addressId": "{{addressId}}",
+  "items": [
+    { "productId": "00000000-0000-0000-0000-000000000000", "quantity": 1 }
+  ]
+}
+
+### 6. Endereco de outro usuario -> 409 (validado por gRPC no Identity)
+POST {{host}}/api/orders
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "addressId": "00000000-0000-0000-0000-000000000001",
+  "items": [
+    { "productId": "{{productId}}", "quantity": 1 }
+  ]
+}
+
+### Saude
+GET {{host}}/health/ready

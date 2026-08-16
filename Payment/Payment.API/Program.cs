@@ -1,33 +1,40 @@
 using Marketplace.Infrastructure.Messaging;
 using Marketplace.Infrastructure.Observability;
+using Marketplace.Infrastructure.Web;
 using MassTransit;
 using Payment.Application;
 using Payment.Application.Consumers;
 using Payment.Infrastructure;
 
+// ============================================================================
+// Payment Service — autorizacao (simulada) de pagamento.
+//
+// Servico puramente reativo: nao expoe endpoint de negocio, apenas consome
+// OrderCreatedEvent e publica PaymentApprovedEvent ou PaymentFailedEvent.
+//
+// Continua sendo uma aplicacao web por dois motivos praticos: expor os health
+// checks que o Kubernetes consulta e o endpoint de metricas.
+// ============================================================================
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddApplication();
+builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMarketplaceTelemetry(builder.Configuration, "payment-service");
-builder.Services.AddMassTransit(configuration =>
+
+builder.Services.AddMassTransit(bus =>
 {
-    configuration.AddConsumer<OrderCreatedConsumer>();
-    configuration.ConfigureMarketplaceBus(builder.Configuration);
+    bus.AddConsumer<OrderCreatedConsumer>();
+    bus.ConfigureMarketplaceBus(builder.Configuration, "payment");
 });
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddMarketplaceHealthChecks().AddRedisCheck();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseMarketplaceExceptionHandling();
 
-app.MapControllers();
+app.MapMarketplaceHealthEndpoints();
 app.MapGet("/", () => Results.Ok(new { service = "payment-service" }));
 
-app.Run();
+await app.RunAsync();

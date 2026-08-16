@@ -1,13 +1,13 @@
 namespace Identity.Application.Models;
 
 /// <summary>
-/// Represents an address exposed by the Identity service.
+/// Endereco exposto pela API do Identity.
 /// </summary>
-/// <param name="Id">The address identifier.</param>
-/// <param name="Street">The street name.</param>
-/// <param name="Number">The street number.</param>
-/// <param name="City">The city name.</param>
-/// <param name="State">The state or province.</param>
-/// <param name="ZipCode">The postal code.</param>
-/// <param name="Country">The country name.</param>
+/// <param name="Id">Identificador do endereco (usado ao criar um pedido).</param>
+/// <param name="Street">Logradouro.</param>
+/// <param name="Number">Numero.</param>
+/// <param name="City">Cidade.</param>
+/// <param name="State">Estado ou provincia.</param>
+/// <param name="ZipCode">CEP.</param>
+/// <param name="Country">Pais.</param>
 public sealed record AddressDto(Guid Id, string Street, string Number, string City, string State, string ZipCode, string Country);

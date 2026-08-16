@@ -4,8 +4,12 @@ using Microsoft.EntityFrameworkCore.Design;
 namespace Inventory.Infrastructure.Persistence;
 
 /// <summary>
-/// Creates <see cref="InventoryDbContext"/> instances for design-time tooling.
+/// Fabrica de <see cref="InventoryDbContext"/> para as ferramentas de linha de comando.
 /// </summary>
+/// <remarks>
+/// Usada somente por <c>dotnet ef</c>. A connection string fixa aponta para o ambiente
+/// local e nao tem efeito em runtime.
+/// </remarks>
 public sealed class InventoryDbContextFactory : IDesignTimeDbContextFactory<InventoryDbContext>
 {
     /// <inheritdoc />

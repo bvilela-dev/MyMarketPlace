@@ -1,46 +1,80 @@
 {
   "info": {
-    "_postman_id": "e2f94f07-d5b8-4e08-9f49-1c4de1c77b7d",
     "name": "MyMarketPlace",
-    "description": "Collection para testar todos os endpoints HTTP implementados no MyMarketPlace.\n\nObservacoes:\n- A collection usa endpoints diretos dos servicos e o healthcheck do gateway.\n- Os endpoints protegidos do Identity usam o bearer token salvo automaticamente apos register, login ou refresh.\n- Preencha productId com um GUID valido existente no Catalog quando quiser testar GET product e Create Order com dados reais.",
+    "description": "Colecao de demonstracao do MyMarketPlace.\n\nCOMO USAR\n1. Suba o ambiente: `docker compose up -d --build`\n2. Rode as requisicoes NA ORDEM em que aparecem.\n3. As variaveis (accessToken, userId, addressId, productId, orderId) sao\n   preenchidas automaticamente pelos scripts de teste de cada requisicao.\n\nO QUE A COLECAO DEMONSTRA\n- fluxo completo de compra (cadastro -> endereco -> carrinho -> pedido);\n- saga assincrono: o status do pedido evolui sozinho ao longo de alguns segundos;\n- caminho de compensacao: pedido acima do limite e recusado;\n- protecoes de seguranca (IDOR, 401, 403);\n- respostas de erro padronizadas (RFC 9457).\n\nTodas as chamadas passam pelo API Gateway (porta 5000).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "gateway_base_url", "value": "http://localhost:5093" },
-    { "key": "identity_base_url", "value": "http://localhost:5008" },
-    { "key": "catalog_base_url", "value": "http://localhost:5126" },
-    { "key": "cart_base_url", "value": "http://localhost:5279" },
-    { "key": "order_base_url", "value": "http://localhost:5063" },
-    { "key": "payment_base_url", "value": "http://localhost:5067" },
-    { "key": "inventory_base_url", "value": "http://localhost:5101" },
-    { "key": "notification_base_url", "value": "http://localhost:5281" },
-    { "key": "userId", "value": "00000000-0000-0000-0000-000000000000" },
-    { "key": "addressId", "value": "00000000-0000-0000-0000-000000000000" },
-    { "key": "productId", "value": "00000000-0000-0000-0000-000000000000" },
-    { "key": "accessToken", "value": "" },
-    { "key": "refreshToken", "value": "" }
+    {
+      "key": "gateway",
+      "value": "http://localhost:5000",
+      "description": "Endereco do API Gateway."
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "description": "Preenchido pelo cadastro/login."
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "addressId",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "expensiveProductId",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    }
   ],
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      { "key": "token", "value": "{{accessToken}}", "type": "string" }
-    ]
-  },
   "item": [
     {
-      "name": "Gateway",
+      "name": "1. Catalogo (publico)",
+      "description": "A vitrine nao exige autenticacao. Aqui sai o productId usado adiante.",
       "item": [
         {
-          "name": "Health - API Gateway",
+          "name": "Listar produtos",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{gateway_base_url}}/",
-              "host": ["{{gateway_base_url}}"],
-              "path": [""]
+              "raw": "{{gateway}}/catalog/api/products?page=1&pageSize=10",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "catalog",
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                }
+              ]
             },
-            "description": "Valida se o API Gateway esta de pe."
+            "description": "Listagem paginada. Guarda o primeiro produto em {{productId}}.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -48,48 +82,121 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('catalogo populado', () => pm.expect(body.items.length).to.be.above(0));",
+                  "pm.collectionVariables.set('productId', body.items[0].id);",
+                  "// Produto caro, usado depois para provocar a recusa de pagamento.",
+                  "const caro = body.items.reduce((a, b) => (a.price > b.price ? a : b));",
+                  "pm.collectionVariables.set('expensiveProductId', caro.id);"
                 ]
               }
             }
-          ],
-          "response": []
+          ]
+        },
+        {
+          "name": "Buscar produto por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway}}/catalog/api/products/{{productId}}",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "catalog",
+                "api",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "Leitura por id: passa pelo cache-aside no Redis. A segunda chamada nao toca no banco.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar produto inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway}}/catalog/api/products/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "catalog",
+                "api",
+                "products",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            },
+            "description": "Deve devolver 404, e nao 500.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "Identity",
+      "name": "2. Identidade",
+      "description": "Cadastro, login e rotacao de refresh token.",
       "item": [
         {
-          "name": "Health - Identity",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "auth": { "type": "noauth" },
-            "url": {
-              "raw": "{{identity_base_url}}/",
-              "host": ["{{identity_base_url}}"],
-              "path": [""]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Register User",
+          "name": "Cadastrar usuario",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{gateway}}/identity/api/auth/register",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Cria o usuario e publica UserCreatedEvent via outbox.\nConfirme no log: docker compose logs notification-api | grep E-MAIL",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Bruno Vilela\",\n  \"email\": \"bruno.vilela+postman@example.com\",\n  \"password\": \"StrongP@ss123\"\n}"
+              "raw": "{\n  \"name\": \"Bruno Demo\",\n  \"email\": \"bruno.demo@teste.com\",\n  \"password\": \"senha-forte-123\"\n}"
             },
-            "url": {
-              "raw": "{{identity_base_url}}/api/auth/register",
-              "host": ["{{identity_base_url}}"],
-              "path": ["api", "auth", "register"]
+            "auth": {
+              "type": "noauth"
             }
           },
           "event": [
@@ -98,33 +205,135 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "var json = pm.response.json();",
-                  "if (json.userId) pm.collectionVariables.set('userId', json.userId);",
-                  "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
-                  "if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);"
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "pm.collectionVariables.set('userId', body.userId);",
+                  "pm.test('email normalizado', () => pm.expect(body.email).to.eql(body.email.toLowerCase()));"
                 ]
               }
             }
-          ],
-          "response": []
+          ]
+        },
+        {
+          "name": "Cadastro duplicado (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway}}/identity/api/auth/register",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Mesmo e-mail com caixa diferente. Antes da correcao, isso passava pela checagem\ne estourava violacao de indice unico no Postgres (HTTP 500). Agora responde 409.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Outro\",\n  \"email\": \"BRUNO.DEMO@Teste.com\",\n  \"password\": \"outra-senha-123\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cadastro invalido (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway}}/identity/api/auth/register",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Resposta em application/problem+json (RFC 9457) com TODOS os campos invalidos de uma vez.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"email\": \"nao-e-email\",\n  \"password\": \"123\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test('lista os campos invalidos', () => pm.expect(Object.keys(body.errors).length).to.be.above(2));",
+                  "pm.test('inclui traceId', () => pm.expect(body).to.have.property('traceId'));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Login",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{gateway}}/identity/api/auth/login",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Autentica e renova os tokens da colecao.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"bruno.vilela+postman@example.com\",\n  \"password\": \"StrongP@ss123\"\n}"
+              "raw": "{\n  \"email\": \"bruno.demo@teste.com\",\n  \"password\": \"senha-forte-123\"\n}"
             },
-            "url": {
-              "raw": "{{identity_base_url}}/api/auth/login",
-              "host": ["{{identity_base_url}}"],
-              "path": ["api", "auth", "login"]
+            "auth": {
+              "type": "noauth"
             }
           },
           "event": [
@@ -133,33 +342,87 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "var json = pm.response.json();",
-                  "if (json.userId) pm.collectionVariables.set('userId', json.userId);",
-                  "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
-                  "if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);"
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', body.refreshToken);"
                 ]
               }
             }
-          ],
-          "response": []
+          ]
         },
         {
-          "name": "Refresh Token",
+          "name": "Login com senha errada (401)",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{gateway}}/identity/api/auth/login",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "A mensagem e identica a de usuario inexistente — evita enumeracao de contas.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bruno.demo@teste.com\",\n  \"password\": \"senha-errada\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Renovar token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway}}/identity/api/auth/refresh",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Rotacao: o refresh token apresentado e revogado e um novo par e emitido.\nRodar esta requisicao duas vezes seguidas resulta em 401 na segunda.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
             },
-            "url": {
-              "raw": "{{identity_base_url}}/api/auth/refresh",
-              "host": ["{{identity_base_url}}"],
-              "path": ["api", "auth", "refresh"]
+            "auth": {
+              "type": "noauth"
             }
           },
           "event": [
@@ -168,45 +431,94 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "var json = pm.response.json();",
-                  "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
-                  "if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);"
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('token realmente rotacionado', () => pm.expect(body.refreshToken).to.not.eql(pm.collectionVariables.get('refreshToken')));",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', body.refreshToken);"
                 ]
               }
             }
-          ],
-          "response": []
+          ]
         },
         {
-          "name": "Get User By Id",
+          "name": "Meu perfil",
           "request": {
             "method": "GET",
             "header": [],
-            "auth": { "type": "noauth" },
             "url": {
-              "raw": "{{identity_base_url}}/api/users/{{userId}}",
-              "host": ["{{identity_base_url}}"],
-              "path": ["api", "users", "{{userId}}"]
+              "raw": "{{gateway}}/identity/api/users/me",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "users",
+                "me"
+              ]
+            },
+            "description": "O identificador vem do token, nunca da URL.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
-          "response": []
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
         },
         {
-          "name": "Add Address",
+          "name": "Cadastrar endereco",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
+            "url": {
+              "raw": "{{gateway}}/identity/api/users/{{userId}}/addresses",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "users",
+                "{{userId}}",
+                "addresses"
+              ]
+            },
+            "description": "Guarda o addressId, necessario para criar o pedido.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"street\": \"Av. Paulista\",\n  \"number\": \"1000\",\n  \"city\": \"Sao Paulo\",\n  \"state\": \"SP\",\n  \"zipCode\": \"01310-100\",\n  \"country\": \"Brasil\"\n}"
+              "raw": "{\n  \"street\": \"Rua das Flores\",\n  \"number\": \"123\",\n  \"city\": \"Sao Paulo\",\n  \"state\": \"SP\",\n  \"zipCode\": \"01234-567\",\n  \"country\": \"Brasil\"\n}"
             },
-            "url": {
-              "raw": "{{identity_base_url}}/api/users/{{userId}}/addresses",
-              "host": ["{{identity_base_url}}"],
-              "path": ["api", "users", "{{userId}}", "addresses"]
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "event": [
@@ -215,198 +527,665 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-                  "var json = pm.response.json();",
-                  "if (json.id) pm.collectionVariables.set('addressId', json.id);"
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('addressId', pm.response.json().id);"
                 ]
               }
             }
-          ],
-          "response": []
+          ]
         }
       ]
     },
     {
-      "name": "Catalog",
+      "name": "3. Seguranca",
+      "description": "As correcoes de IDOR e o comportamento sem token.",
       "item": [
         {
-          "name": "Health - Catalog",
+          "name": "Perfil de outro usuario (403)",
           "request": {
             "method": "GET",
             "header": [],
-            "auth": { "type": "noauth" },
             "url": {
-              "raw": "{{catalog_base_url}}/",
-              "host": ["{{catalog_base_url}}"],
-              "path": [""]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Product By Id",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "auth": { "type": "noauth" },
-            "url": {
-              "raw": "{{catalog_base_url}}/api/products/{{productId}}",
-              "host": ["{{catalog_base_url}}"],
-              "path": ["api", "products", "{{productId}}"]
+              "raw": "{{gateway}}/identity/api/users/00000000-0000-0000-0000-000000000001",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "users",
+                "00000000-0000-0000-0000-000000000001"
+              ]
             },
-            "description": "Requer que {{productId}} exista no Catalog."
+            "description": "Token valido, recurso de terceiro. Antes era [AllowAnonymous]: qualquer pessoa\nlia nome, e-mail e enderecos de qualquer usuario apenas variando o GUID.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
-          "response": []
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway}}/identity/api/users/me",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "identity",
+                "api",
+                "users",
+                "me"
+              ]
+            },
+            "description": "401 = 'nao sei quem voce e'. Diferente de 403 = 'sei, e voce nao pode'.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Carrinho sem token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway}}/cart/api/carts/me",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "cart",
+                "api",
+                "carts",
+                "me"
+              ]
+            },
+            "description": "A rota antiga /api/carts/{userId} nao existe mais: sem parametro de id,\nnao ha como pedir o carrinho de outra pessoa.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "Cart",
+      "name": "4. Carrinho",
+      "description": "Carrinho completo em Redis, com TTL de 7 dias.",
       "item": [
         {
-          "name": "Health - Cart",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "auth": { "type": "noauth" },
-            "url": {
-              "raw": "{{cart_base_url}}/",
-              "host": ["{{cart_base_url}}"],
-              "path": [""]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Upsert Cart",
+          "name": "Gravar carrinho",
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{gateway}}/cart/api/carts/me",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "cart",
+                "api",
+                "carts",
+                "me"
+              ]
+            },
+            "description": "PUT porque substitui o recurso inteiro e e idempotente: reenviar o mesmo\ncorpo leva sempre ao mesmo estado final.\nNote que ha DUAS linhas do mesmo produto — o dominio as consolida em uma.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"name\": \"Notebook Gamer\",\n      \"unitPrice\": 8999.90,\n      \"quantity\": 1\n    }\n  ]\n}"
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"name\": \"Produto\",\n      \"unitPrice\": 279.9,\n      \"quantity\": 1\n    },\n    {\n      \"productId\": \"{{productId}}\",\n      \"name\": \"Produto\",\n      \"unitPrice\": 279.9,\n      \"quantity\": 1\n    }\n  ]\n}"
             },
-            "url": {
-              "raw": "{{cart_base_url}}/api/carts/{{userId}}",
-              "host": ["{{cart_base_url}}"],
-              "path": ["api", "carts", "{{userId}}"]
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
-          "response": []
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('itens repetidos foram consolidados', () => pm.expect(body.items.length).to.eql(1));",
+                  "pm.test('quantidade somada', () => pm.expect(body.items[0].quantity).to.eql(2));"
+                ]
+              }
+            }
+          ]
         },
         {
-          "name": "Get Cart By User Id",
+          "name": "Consultar carrinho",
           "request": {
             "method": "GET",
             "header": [],
-            "auth": { "type": "noauth" },
             "url": {
-              "raw": "{{cart_base_url}}/api/carts/{{userId}}",
-              "host": ["{{cart_base_url}}"],
-              "path": ["api", "carts", "{{userId}}"]
+              "raw": "{{gateway}}/cart/api/carts/me",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "cart",
+                "api",
+                "carts",
+                "me"
+              ]
+            },
+            "description": "Le do Redis. O total e calculado, nunca armazenado.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
-          "response": []
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Esvaziar carrinho",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{gateway}}/cart/api/carts/me",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "cart",
+                "api",
+                "carts",
+                "me"
+              ]
+            },
+            "description": "204 mesmo que o carrinho ja nao exista: DELETE e idempotente por definicao.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "Order",
+      "name": "5. Pedido e saga",
+      "description": "O coracao da demonstracao.\n\nCriar o pedido devolve 201 imediatamente com status PendingPayment. O restante do\nfluxo e assincrono: rode 'Consultar pedido' algumas vezes e veja o status evoluir\nPendingPayment -> Paid -> Confirmed em poucos segundos.",
       "item": [
         {
-          "name": "Health - Order",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "auth": { "type": "noauth" },
-            "url": {
-              "raw": "{{order_base_url}}/",
-              "host": ["{{order_base_url}}"],
-              "path": [""]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Create Order",
+          "name": "Criar pedido",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{gateway}}/order/api/orders",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "order",
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Repare no que NAO existe no corpo: userId (vem do token) e preco (vem do\nCatalog, por gRPC). Aceitar qualquer um dos dois do cliente seria falha grave.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"addressId\": \"{{addressId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
+              "raw": "{\n  \"addressId\": \"{{addressId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 2\n    }\n  ]\n}"
             },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('orderId', body.orderId);",
+                  "pm.test('comeca aguardando pagamento', () => pm.expect(body.status).to.eql('PendingPayment'));",
+                  "pm.test('total calculado pelo servidor', () => pm.expect(body.total).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar pedido",
+          "request": {
+            "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{order_base_url}}/api/orders",
-              "host": ["{{order_base_url}}"],
-              "path": ["api", "orders"]
+              "raw": "{{gateway}}/order/api/orders/{{orderId}}",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "order",
+                "api",
+                "orders",
+                "{{orderId}}"
+              ]
             },
-            "description": "Requer um userId valido, um addressId do Identity e um productId existente no Catalog."
+            "description": "RODE ALGUMAS VEZES. O status caminha sozinho conforme os eventos sao processados:\n  PendingPayment -> Paid (PaymentApproved) -> Confirmed (StockReserved)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
-          "response": []
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "console.log('Status atual do pedido:', body.status);",
+                  "pm.test('status valido', () => pm.expect(['PendingPayment','Paid','Confirmed']).to.include(body.status));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar meus pedidos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway}}/order/api/orders?page=1&pageSize=20",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "order",
+                "api",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Lista apenas os pedidos do usuario do token — o filtro esta na propria consulta.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedido acima do limite (compensacao)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway}}/order/api/orders",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "order",
+                "api",
+                "orders"
+              ]
+            },
+            "description": "10 unidades do produto mais caro ultrapassam o limite simulado de R$ 10.000.\nAlguns segundos depois, o status vira PaymentFailed com o motivo em statusReason.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addressId\": \"{{addressId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{expensiveProductId}}\",\n      \"quantity\": 10\n    }\n  ]\n}"
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('orderId', pm.response.json().orderId);",
+                  "console.log('Consulte este pedido em alguns segundos: deve estar PaymentFailed.');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedido com produto inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway}}/order/api/orders",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "order",
+                "api",
+                "orders"
+              ]
+            },
+            "description": "O Catalog responde que o produto nao existe e o pedido nao e criado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addressId\": \"{{addressId}}\",\n  \"items\": [\n    {\n      \"productId\": \"00000000-0000-0000-0000-000000000000\",\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedido sem itens (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway}}/order/api/orders",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "order",
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Barrado pelo validador, antes de qualquer chamada gRPC ou acesso ao banco.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addressId\": \"{{addressId}}\",\n  \"items\": []\n}"
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "Payment",
+      "name": "6. Saude dos servicos",
+      "description": "Endpoints consultados pelas probes do Kubernetes.",
       "item": [
         {
-          "name": "Health - Payment",
+          "name": "Liveness do gateway",
           "request": {
             "method": "GET",
             "header": [],
-            "auth": { "type": "noauth" },
             "url": {
-              "raw": "{{payment_base_url}}/",
-              "host": ["{{payment_base_url}}"],
-              "path": [""]
+              "raw": "{{gateway}}/health/live",
+              "host": [
+                "{{gateway}}"
+              ],
+              "path": [
+                "health",
+                "live"
+              ]
+            },
+            "description": "'O processo esta vivo?' Nao consulta dependencia alguma.\nSe falhar, o Kubernetes REINICIA o pod.",
+            "auth": {
+              "type": "noauth"
             }
           },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Inventory",
-      "item": [
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
         {
-          "name": "Health - Inventory",
+          "name": "Readiness do Identity",
           "request": {
             "method": "GET",
             "header": [],
-            "auth": { "type": "noauth" },
             "url": {
-              "raw": "{{inventory_base_url}}/",
-              "host": ["{{inventory_base_url}}"],
-              "path": [""]
+              "raw": "http://localhost:5100/health/ready",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "5100",
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "description": "'Posso receber trafego?' Verifica banco e cache.\nSe falhar, o pod so sai do balanceador — sem reinicio.",
+            "auth": {
+              "type": "noauth"
             }
           },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Notification",
-      "item": [
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
         {
-          "name": "Health - Notification",
+          "name": "Readiness do Catalog",
           "request": {
             "method": "GET",
             "header": [],
-            "auth": { "type": "noauth" },
             "url": {
-              "raw": "{{notification_base_url}}/",
-              "host": ["{{notification_base_url}}"],
-              "path": [""]
+              "raw": "http://localhost:5200/health/ready",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "5200",
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "description": "Verifica Postgres e Redis.",
+            "auth": {
+              "type": "noauth"
             }
-          },
-          "response": []
+          }
         }
       ]
     }

@@ -1,0 +1,122 @@
+# =============================================================================
+# Integracao continua.
+#
+# Roda a cada push e pull request:
+#   1. build da solucao inteira tratando warning como erro;
+#   2. suite de testes unitarios;
+#   3. auditoria de vulnerabilidades nos pacotes NuGet;
+#   4. build das oito imagens Docker (garante que os Dockerfiles nao quebraram).
+#
+# O objetivo nao e ter um selo verde no README: e que qualquer pessoa que abra um
+# PR descubra em minutos, e nao em producao, que algo parou de funcionar.
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Permite disparar manualmente pela aba Actions.
+  workflow_dispatch:
+
+# Cancela execucoes antigas do mesmo branch quando chega um push novo:
+# nao adianta gastar runner validando um commit que ja foi substituido.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  # Telemetria desligada: reduz ruido de rede e tempo de partida no runner.
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    name: Build e testes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          # A versao exata vem do global.json — evita divergencia entre a maquina
+          # do desenvolvedor e o CI.
+          global-json-file: global.json
+
+      - name: Cache de pacotes NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          # A chave inclui o hash do Directory.Packages.props: como o projeto usa
+          # gerenciamento centralizado de versoes, esse arquivo sozinho determina
+          # todas as dependencias. Mudou o arquivo, cache novo.
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore MyMarketPlace.slnx
+
+      - name: Build
+        # TreatWarningsAsErrors so no CI: localmente um warning nao deve travar o
+        # trabalho, mas nao pode entrar no branch principal.
+        run: dotnet build MyMarketPlace.slnx --configuration Release --no-restore -warnaserror
+
+      - name: Testes
+        run: dotnet test --configuration Release --no-build
+
+      - name: Auditoria de vulnerabilidades
+        # Falha o job se alguma dependencia (direta ou transitiva) tiver
+        # vulnerabilidade conhecida. Continua depois do build para que um alerta
+        # novo publicado no NuGet nao esconda um erro de compilacao real.
+        run: |
+          dotnet list MyMarketPlace.slnx package --vulnerable --include-transitive 2>&1 | tee auditoria.txt
+          if grep -q "has the following vulnerable packages" auditoria.txt; then
+            echo "::error::Foram encontradas dependencias com vulnerabilidades conhecidas."
+            exit 1
+          fi
+
+  docker:
+    name: Build das imagens
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    strategy:
+      # fail-fast desligado: se o Dockerfile do Order quebrar, ainda interessa
+      # saber se os outros sete tambem quebraram ou se o problema e isolado.
+      fail-fast: false
+      matrix:
+        service:
+          - {nome: identity, caminho: Identity/Identity.API}
+          - {nome: catalog, caminho: Catalog/Catalog.API}
+          - {nome: cart, caminho: Cart/Cart.API}
+          - {nome: order, caminho: Order/Order.API}
+          - {nome: payment, caminho: Payment/Payment.API}
+          - {nome: inventory, caminho: Inventory/Inventory.API}
+          - {nome: notification, caminho: Notification/Notification.API}
+          - {nome: gateway, caminho: ApiGateway/ApiGateway.API}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build da imagem ${{ matrix.service.nome }}
+        uses: docker/build-push-action@v6
+        with:
+          # Contexto e a raiz do repositorio: os servicos dependem dos building
+          # blocks compartilhados, que ficam fora da pasta de cada servico.
+          context: .
+          file: ${{ matrix.service.caminho }}/Dockerfile
+          # push: false — o CI apenas valida que a imagem compila. Publicar em
+          # registry seria papel de um workflow de release, disparado por tag.
+          push: false
+          tags: mymarketplace/${{ matrix.service.nome }}-api:ci
+          cache-from: type=gha,scope=${{ matrix.service.nome }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.nome }}

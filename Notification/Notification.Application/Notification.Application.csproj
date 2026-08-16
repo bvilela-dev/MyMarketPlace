@@ -1,10 +1,11 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!--
+    Camada de aplicacao do Notification: um consumidor por evento.
+
+    Nao existe projeto Notification.Domain — o servico nao possui entidade nem
+    invariante propria. Camada vazia so por simetria seria ruido.
+  -->
 
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\Marketplace.Contracts\Marketplace.Contracts.csproj" />

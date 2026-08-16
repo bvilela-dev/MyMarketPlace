@@ -5,27 +5,52 @@ using Microsoft.EntityFrameworkCore;
 namespace Identity.API.Grpc;
 
 /// <summary>
-/// Provides gRPC validation of user and address data for downstream services.
+/// Servico gRPC que valida o par usuario/endereco para os demais microsservicos.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Por que gRPC entre servicos e REST para o cliente?</b> gRPC usa HTTP/2 com
+/// serializacao binaria (Protobuf): payload menor, conexao multiplexada e contrato
+/// forte gerado em tempo de compilacao. Numa chamada interna, chamada milhares de vezes
+/// por minuto, isso e ganho real. Para o navegador, REST/JSON continua sendo o caminho
+/// pratico.
+/// </para>
+/// <para>
+/// <b>Correcao aplicada:</b> a versao anterior usava <c>Guid.Parse</c> direto no valor
+/// recebido. Um identificador malformado lancava <c>FormatException</c>, que o gRPC
+/// traduzia num <c>StatusCode.Unknown</c> generico — e o Order, protegido por Polly,
+/// ainda repetia a chamada tres vezes antes de desistir. Agora um id invalido responde
+/// imediatamente <c>IsValid = false</c>.
+/// </para>
+/// </remarks>
+/// <param name="dbContext">Contexto de leitura do banco do Identity.</param>
 public sealed class UserValidationGrpcService(IdentityDbContext dbContext) : UserValidation.UserValidationBase
 {
     /// <summary>
-    /// Validates that the specified user and address identifiers belong together.
+    /// Verifica se o endereco informado pertence ao usuario informado.
     /// </summary>
-    /// <param name="request">The validation request payload.</param>
-    /// <param name="context">The gRPC server call context.</param>
-    /// <returns>A response describing whether the user and address are valid.</returns>
+    /// <param name="request">Identificadores de usuario e endereco.</param>
+    /// <param name="context">Contexto da chamada gRPC.</param>
+    /// <returns>
+    /// Resultado da validacao; quando valido, ja acompanha os campos do endereco para
+    /// evitar uma segunda chamada.
+    /// </returns>
     public override async Task<ValidateUserAddressResponse> ValidateUserAddress(ValidateUserAddressRequest request, ServerCallContext context)
     {
-        var userId = Guid.Parse(request.UserId);
-        var addressId = Guid.Parse(request.AddressId);
+        if (!Guid.TryParse(request.UserId, out var userId) || !Guid.TryParse(request.AddressId, out var addressId))
+        {
+            return new ValidateUserAddressResponse { IsValid = false };
+        }
 
-        var user = await dbContext.Users
-            .Include(candidate => candidate.Addresses)
-            .FirstOrDefaultAsync(candidate => candidate.Id == userId, context.CancellationToken);
+        // Consulta direta na tabela de enderecos com as duas condicoes: resolve em um
+        // unico SELECT, sem carregar o usuario nem sua colecao inteira de enderecos.
+        var address = await dbContext.Addresses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                candidate => candidate.Id == addressId && candidate.UserId == userId,
+                context.CancellationToken);
 
-        var address = user?.Addresses.FirstOrDefault(candidate => candidate.Id == addressId);
-        if (user is null || address is null)
+        if (address is null)
         {
             return new ValidateUserAddressResponse { IsValid = false };
         }
@@ -33,7 +58,7 @@ public sealed class UserValidationGrpcService(IdentityDbContext dbContext) : Use
         return new ValidateUserAddressResponse
         {
             IsValid = true,
-            UserId = user.Id.ToString(),
+            UserId = userId.ToString(),
             AddressId = address.Id.ToString(),
             Street = address.Street,
             Number = address.Number,

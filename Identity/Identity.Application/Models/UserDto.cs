@@ -1,11 +1,16 @@
 namespace Identity.Application.Models;
 
 /// <summary>
-/// Represents a user profile exposed by the Identity service.
+/// Perfil publico de um usuario.
 /// </summary>
-/// <param name="Id">The user identifier.</param>
-/// <param name="Name">The user display name.</param>
-/// <param name="Email">The user email address.</param>
-/// <param name="CreatedAt">The user creation timestamp.</param>
-/// <param name="Addresses">The list of user addresses.</param>
-public sealed record UserDto(Guid Id, string Name, string Email, DateTime CreatedAt, IReadOnlyCollection<AddressDto> Addresses);
+/// <remarks>
+/// Repare no que <b>nao</b> esta aqui: <c>PasswordHash</c> e a lista de refresh tokens.
+/// Devolver a entidade de dominio direto no endpoint vazaria os dois. E a razao pratica
+/// de existir um DTO separado, alem do desacoplamento entre modelo interno e contrato.
+/// </remarks>
+/// <param name="Id">Identificador do usuario.</param>
+/// <param name="Name">Nome de exibicao.</param>
+/// <param name="Email">E-mail normalizado.</param>
+/// <param name="CreatedAtUtc">Momento (UTC) do cadastro.</param>
+/// <param name="Addresses">Enderecos cadastrados.</param>
+public sealed record UserDto(Guid Id, string Name, string Email, DateTime CreatedAtUtc, IReadOnlyCollection<AddressDto> Addresses);

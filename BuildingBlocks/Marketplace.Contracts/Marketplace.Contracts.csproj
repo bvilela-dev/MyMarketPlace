@@ -1,9 +1,16 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!--
+    Contratos publicos trocados entre microsservicos: eventos de integracao
+    (RabbitMQ) e DTOs de gRPC.
+
+    Assim como o SharedKernel, nao referencia nada: um contrato precisa ser
+    consumivel por qualquer servico sem arrastar dependencias junto.
+
+    ATENCAO ao evoluir este projeto: alterar um record aqui muda o formato da
+    mensagem que trafega no barramento. Servicos com versao antiga continuam
+    publicando/consumindo o formato anterior, entao mudancas devem ser sempre
+    aditivas (novos campos opcionais) — nunca renomear ou remover campos.
+  -->
 
 </Project>

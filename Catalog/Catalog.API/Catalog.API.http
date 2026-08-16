@@ -1,6 +1,48 @@
-@Catalog.API_HostAddress = http://localhost:5126
+### Catalog API
 
-GET {{Catalog.API_HostAddress}}/weatherforecast/
-Accept: application/json
+@host = http://localhost:5200
 
-###
+### 1. Listar produtos (publico, paginado)
+# @name listar
+GET {{host}}/api/products?page=1&pageSize=10
+
+@productId = {{listar.response.body.items[0].id}}
+
+### 2. Buscar por nome (ILIKE)
+GET {{host}}/api/products?search=teclado
+
+### 3. Buscar por id — passa pelo cache-aside no Redis.
+### Rode duas vezes e compare o tempo: a segunda nao toca no banco.
+GET {{host}}/api/products/{{productId}}
+
+### 4. Produto inexistente -> 404
+GET {{host}}/api/products/00000000-0000-0000-0000-000000000000
+
+### 5. Cadastrar produto (exige autenticacao)
+### Obtenha o token no Identity.API.http primeiro.
+@accessToken = COLE_O_TOKEN_AQUI
+
+POST {{host}}/api/products
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Mousepad XL",
+  "description": "Mousepad de 90x40cm com base antiderrapante.",
+  "price": 89.90,
+  "availableQuantity": 100
+}
+
+### 6. Sem token -> 401
+POST {{host}}/api/products
+Content-Type: application/json
+
+{
+  "name": "Teste",
+  "description": "Teste",
+  "price": 10,
+  "availableQuantity": 1
+}
+
+### Saude (verifica Postgres e Redis)
+GET {{host}}/health/ready

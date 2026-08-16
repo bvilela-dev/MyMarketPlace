@@ -4,7 +4,7 @@ using MediatR;
 namespace Identity.Application.Users;
 
 /// <summary>
-/// Represents the request to retrieve a user by identifier.
+/// Consulta o perfil de um usuario.
 /// </summary>
-/// <param name="UserId">The user identifier.</param>
+/// <param name="UserId">Identificador do usuario.</param>
 public sealed record GetUserByIdQuery(Guid UserId) : IRequest<UserDto?>;

@@ -1,6 +1,94 @@
-@Identity.API_HostAddress = http://localhost:5008
+### Identity API — requisicoes rapidas para o VS Code / Rider / Visual Studio.
+### Rode de cima para baixo: as variaveis sao encadeadas.
 
-GET {{Identity.API_HostAddress}}/weatherforecast/
-Accept: application/json
+@host = http://localhost:5100
 
-###
+### 1. Cadastrar usuario
+# @name cadastrar
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Bruno Demo",
+  "email": "bruno.demo@teste.com",
+  "password": "senha-forte-123"
+}
+
+### Captura os dados da resposta anterior.
+@accessToken = {{cadastrar.response.body.accessToken}}
+@refreshToken = {{cadastrar.response.body.refreshToken}}
+@userId = {{cadastrar.response.body.userId}}
+
+### 2. Cadastro duplicado -> 409 (mesmo e-mail com caixa diferente)
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Outro",
+  "email": "BRUNO.DEMO@Teste.com",
+  "password": "outra-senha-123"
+}
+
+### 3. Cadastro invalido -> 400 com a lista de campos (RFC 9457)
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "",
+  "email": "nao-e-email",
+  "password": "123"
+}
+
+### 4. Login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "bruno.demo@teste.com",
+  "password": "senha-forte-123"
+}
+
+### 5. Login com senha errada -> 401 (mensagem identica a de usuario inexistente)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "bruno.demo@teste.com",
+  "password": "senha-errada"
+}
+
+### 6. Renovar tokens (rotacao: o token antigo e revogado)
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### 7. Meu perfil (o id vem do token, nao da URL)
+GET {{host}}/api/users/me
+Authorization: Bearer {{accessToken}}
+
+### 8. Cadastrar endereco
+POST {{host}}/api/users/{{userId}}/addresses
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "street": "Rua das Flores",
+  "number": "123",
+  "city": "Sao Paulo",
+  "state": "SP",
+  "zipCode": "01234-567",
+  "country": "Brasil"
+}
+
+### 9. Perfil de outro usuario -> 403 (protecao contra IDOR)
+GET {{host}}/api/users/00000000-0000-0000-0000-000000000001
+Authorization: Bearer {{accessToken}}
+
+### 10. Sem token -> 401
+GET {{host}}/api/users/me
+
+### Saude
+GET {{host}}/health/ready

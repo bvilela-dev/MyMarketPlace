@@ -1,0 +1,18 @@
+# Reduz drasticamente o contexto enviado ao daemon do Docker.
+#
+# Sem este arquivo, cada `docker build` empacota bin/ e obj/ de 30 projetos —
+# centenas de megabytes que sao descartados no primeiro comando do Dockerfile.
+# Pior: um obj/ da maquina local pode conflitar com o restore feito no container.
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+**/node_modules/
+.git/
+.github/
+*.md
+postman/
+k8s/
+observability/
+docker-compose.yml

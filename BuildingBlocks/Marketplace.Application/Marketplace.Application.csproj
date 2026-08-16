@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Building block da camada de aplicacao: comportamentos (behaviors) do pipeline
+    do MediatR compartilhados por todos os microsservicos.
+
+    Antes desta extracao, Identity e Order tinham cada um a sua propria copia do
+    ValidationBehavior — mesmo codigo, dois arquivos, duas chances de divergir.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Marketplace.SharedKernel\Marketplace.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="MediatR" />
+  </ItemGroup>
+
+</Project>

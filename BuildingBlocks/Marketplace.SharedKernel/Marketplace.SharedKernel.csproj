@@ -1,9 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!--
+    Camada mais interna da arquitetura: blocos de dominio (Entity, ValueObject,
+    Result, excecoes de negocio) reaproveitados por todos os microsservicos.
+
+    Regra de ouro: este projeto NAO referencia nada. Sem EF Core, sem MassTransit,
+    sem ASP.NET. Se um dia precisar, e sinal de que a regra de negocio esta vazando
+    para a infraestrutura.
+
+    TargetFramework, Nullable e ImplicitUsings vem do Directory.Build.props da raiz.
+  -->
 
 </Project>

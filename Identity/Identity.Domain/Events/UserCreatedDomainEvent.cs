@@ -3,21 +3,23 @@ using Marketplace.SharedKernel.Abstractions;
 namespace Identity.Domain.Events;
 
 /// <summary>
-/// Represents the domain event raised when a user is created.
+/// Evento de dominio disparado quando um usuario e criado.
 /// </summary>
-/// <param name="UserId">The created user identifier.</param>
-/// <param name="Name">The created user name.</param>
-/// <param name="Email">The created user email.</param>
-/// <param name="CreatedAtUtc">The UTC creation timestamp.</param>
+/// <remarks>
+/// Circula apenas dentro do Identity. O <c>UserCreatedEvent</c> (em
+/// <c>Marketplace.Contracts</c>) e a versao publica, que trafega pelo RabbitMQ ate o
+/// Notification. Manter os dois separados permite evoluir o modelo interno sem quebrar
+/// o contrato com os outros servicos.
+/// </remarks>
+/// <param name="UserId">Identificador do usuario criado.</param>
+/// <param name="Name">Nome de exibicao.</param>
+/// <param name="Email">E-mail normalizado.</param>
+/// <param name="CreatedAtUtc">Momento (UTC) do cadastro.</param>
 public sealed record UserCreatedDomainEvent(Guid UserId, string Name, string Email, DateTime CreatedAtUtc) : IDomainEvent
 {
-    /// <summary>
-    /// Gets the unique event identifier.
-    /// </summary>
+    /// <inheritdoc />
     public Guid EventId { get; } = Guid.NewGuid();
 
-    /// <summary>
-    /// Gets the UTC timestamp when the event occurred.
-    /// </summary>
+    /// <inheritdoc />
     public DateTime OccurredOnUtc { get; } = DateTime.UtcNow;
 }

@@ -3,8 +3,8 @@ using MediatR;
 namespace Identity.Application.Auth;
 
 /// <summary>
-/// Represents the request to authenticate a user.
+/// Comando de autenticacao de um usuario existente.
 /// </summary>
-/// <param name="Email">The user email.</param>
-/// <param name="Password">The plain-text password.</param>
+/// <param name="Email">E-mail cadastrado.</param>
+/// <param name="Password">Senha em texto puro.</param>
 public sealed record LoginCommand(string Email, string Password) : IRequest<AuthResponse>;

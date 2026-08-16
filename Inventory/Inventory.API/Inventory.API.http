@@ -1,6 +1,21 @@
-@Inventory.API_HostAddress = http://localhost:5101
-
-GET {{Inventory.API_HostAddress}}/weatherforecast/
-Accept: application/json
-
+### Inventory API — dono da verdade do estoque, tambem puramente reativo.
 ###
+### Consome ProductCreatedEvent (cria o saldo inicial) e PaymentApprovedEvent
+### (reserva as unidades). Acompanhe com:
+###
+###   docker compose logs -f inventory-api
+###
+### Para inspecionar o estoque diretamente:
+###   docker compose exec postgres-inventory psql -U postgres -d inventorydb \
+###     -c 'SELECT * FROM stock_items;'
+
+@host = http://localhost:5600
+
+### Identificacao do servico
+GET {{host}}/
+
+### Liveness
+GET {{host}}/health/live
+
+### Readiness (verifica Postgres e Redis)
+GET {{host}}/health/ready

@@ -1,10 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!--
+    Camada de infraestrutura do Order: Postgres, clientes gRPC resilientes e outbox.
+  -->
 
   <ItemGroup>
     <ProjectReference Include="..\Order.Application\Order.Application.csproj" />
@@ -30,6 +28,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      Os .proto sao COMPARTILHADOS por link, sem referencia de projeto: o Order gera
+      apenas os stubs de CLIENTE a partir do mesmo arquivo que o servidor usa.
+      Assim o contrato tem uma unica fonte de verdade e uma quebra aparece em tempo
+      de compilacao, nao em producao.
+
+      Em um cenario real com times separados, estes .proto viveriam num repositorio
+      de contratos versionado e distribuido como pacote NuGet.
+    -->
     <Protobuf Include="..\..\Catalog\Catalog.API\Protos\catalog.proto" GrpcServices="Client" Link="Protos\catalog.proto" />
     <Protobuf Include="..\..\Identity\Identity.API\Protos\identity.proto" GrpcServices="Client" Link="Protos\identity.proto" />
   </ItemGroup>

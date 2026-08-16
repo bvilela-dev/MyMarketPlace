@@ -3,20 +3,27 @@ using FluentValidation;
 namespace Identity.Application.Users;
 
 /// <summary>
-/// Validates address creation requests.
+/// Regras de validacao do cadastro de endereco.
 /// </summary>
 public sealed class AddAddressCommandValidator : AbstractValidator<AddAddressCommand>
 {
     /// <summary>
-    /// Initializes the validator rules for <see cref="AddAddressCommand"/>.
+    /// Define as regras de <see cref="AddAddressCommand"/>.
     /// </summary>
+    /// <remarks>
+    /// Os limites de tamanho espelham exatamente os <c>HasMaxLength</c> do
+    /// <c>AddressConfiguration</c>. Manter os dois alinhados transforma o que seria um
+    /// erro de truncamento do Postgres (HTTP 500) numa mensagem clara de campo invalido
+    /// (HTTP 400).
+    /// </remarks>
     public AddAddressCommandValidator()
     {
-        RuleFor(command => command.Street).NotEmpty();
-        RuleFor(command => command.Number).NotEmpty();
-        RuleFor(command => command.City).NotEmpty();
-        RuleFor(command => command.State).NotEmpty();
-        RuleFor(command => command.ZipCode).NotEmpty();
-        RuleFor(command => command.Country).NotEmpty();
+        RuleFor(command => command.UserId).NotEmpty();
+        RuleFor(command => command.Street).NotEmpty().MaximumLength(256);
+        RuleFor(command => command.Number).NotEmpty().MaximumLength(32);
+        RuleFor(command => command.City).NotEmpty().MaximumLength(120);
+        RuleFor(command => command.State).NotEmpty().MaximumLength(120);
+        RuleFor(command => command.ZipCode).NotEmpty().MaximumLength(32);
+        RuleFor(command => command.Country).NotEmpty().MaximumLength(120);
     }
 }

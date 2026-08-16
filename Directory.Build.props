@@ -1,14 +1,59 @@
 <Project>
+  <!--
+    Propriedades aplicadas automaticamente a TODOS os .csproj abaixo desta pasta.
+    Evita repetir TargetFramework/Nullable/LangVersion em 30+ arquivos de projeto.
+  -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- Nullable reference types ligado: o compilador passa a apontar possiveis NullReferenceException. -->
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>13.0</LangVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!--
+      Gera o arquivo XML de documentacao a partir dos comentarios /// do codigo.
+      Efeito colateral proposital: qualquer membro publico sem documentacao vira
+      warning CS1591, o que mantem a documentacao didatica sempre em dia.
+    -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(UsingMicrosoftNETSdkWeb)' != 'true'">
+  <!--
+    Projetos de teste nao expoem API publica para consumidores, entao documentar
+    cada metodo [Fact] so geraria ruido. A convencao adotada e: todo projeto cujo
+    nome termina em "Tests" (Order.UnitTests, Marketplace.SharedKernel.Tests...)
+    desliga a exigencia de documentacao XML e roda como executavel de teste.
+  -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+    <!-- xUnit v3 executa os testes como um processo proprio. -->
+    <OutputType>Exe</OutputType>
+    <!--
+      Habilita o modo Microsoft.Testing.Platform no `dotnet test`. A partir do SDK
+      do .NET 10 o caminho antigo (VSTest) deixou de ser suportado, e sem esta
+      propriedade o comando falha antes de executar qualquer teste.
+    -->
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <!--
+    Projetos de biblioteca (Application/Infrastructure) usam o SDK padrao e, por isso,
+    nao enxergam os tipos de ASP.NET Core (IServiceCollection, IConfiguration,
+    BackgroundService, middlewares...). O FrameworkReference abaixo devolve esse
+    acesso sem trazer o SDK Web inteiro, e e o que permite que os building blocks
+    compartilhem middleware entre servicos.
+
+    Ficam de fora, de proposito, as camadas mais internas — SharedKernel, Contracts
+    e os projetos *.Domain. Elas precisam continuar sem nenhuma dependencia de
+    framework; se um dia deixarem de compilar por causa disso, e porque regra de
+    negocio vazou para a infraestrutura.
+  -->
+  <ItemGroup Condition="'$(UsingMicrosoftNETSdkWeb)' != 'true'
+                        And !$(MSBuildProjectName.EndsWith('Tests'))
+                        And !$(MSBuildProjectName.EndsWith('.Domain'))
+                        And '$(MSBuildProjectName)' != 'Marketplace.SharedKernel'
+                        And '$(MSBuildProjectName)' != 'Marketplace.Contracts'">
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>

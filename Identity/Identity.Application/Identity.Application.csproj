@@ -1,16 +1,19 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!--
+    Camada de aplicacao do Identity: casos de uso (comandos/queries), validadores,
+    DTOs e as interfaces que a infraestrutura implementa.
+
+    Nao referencia Identity.Infrastructure: a dependencia aponta para dentro
+    (Infrastructure -> Application), nunca ao contrario. E a regra de dependencia
+    da Clean Architecture.
+  -->
 
   <ItemGroup>
     <ProjectReference Include="..\Identity.Domain\Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\Marketplace.Application\Marketplace.Application.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\Marketplace.Contracts\Marketplace.Contracts.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\Marketplace.Infrastructure\Marketplace.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\BuildingBlocks\Marketplace.SharedKernel\Marketplace.SharedKernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

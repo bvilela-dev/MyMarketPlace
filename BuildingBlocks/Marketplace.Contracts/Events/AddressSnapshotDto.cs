@@ -1,12 +1,17 @@
 namespace Marketplace.Contracts.Events;
 
 /// <summary>
-/// Represents an immutable address snapshot exchanged between services.
+/// Copia imutavel de um endereco, trafegando em eventos de integracao.
 /// </summary>
-/// <param name="Street">The street name.</param>
-/// <param name="Number">The street number.</param>
-/// <param name="City">The city name.</param>
-/// <param name="State">The state or province.</param>
-/// <param name="ZipCode">The postal code.</param>
-/// <param name="Country">The country name.</param>
+/// <remarks>
+/// "Snapshot" e a palavra-chave: o endereco e copiado para dentro do pedido em vez de
+/// referenciado por id. Se o cliente se mudar amanha, a nota fiscal do pedido de hoje
+/// continua mostrando para onde a mercadoria realmente foi.
+/// </remarks>
+/// <param name="Street">Logradouro.</param>
+/// <param name="Number">Numero.</param>
+/// <param name="City">Cidade.</param>
+/// <param name="State">Estado ou provincia.</param>
+/// <param name="ZipCode">CEP.</param>
+/// <param name="Country">Pais.</param>
 public sealed record AddressSnapshotDto(string Street, string Number, string City, string State, string ZipCode, string Country);

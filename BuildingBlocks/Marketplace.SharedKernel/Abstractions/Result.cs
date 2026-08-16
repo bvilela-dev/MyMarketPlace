@@ -1,15 +1,28 @@
 namespace Marketplace.SharedKernel.Abstractions;
 
 /// <summary>
-/// Represents the result of an operation without a return value.
+/// Resultado de uma operacao que pode falhar, sem valor de retorno.
 /// </summary>
+/// <remarks>
+/// <para>
+/// O padrao <b>Result</b> torna a falha esperada parte da assinatura do metodo. Excecao
+/// custa caro (captura de stack trace) e, pior, e invisivel para quem le a assinatura:
+/// <c>Task&lt;Order&gt;</c> nao avisa que pode explodir. Ja
+/// <c>Task&lt;Result&lt;Order&gt;&gt;</c> obriga quem chama a tratar os dois caminhos.
+/// </para>
+/// <para>
+/// Convencao adotada no projeto: <b>Result</b> para falhas previsiveis de negocio
+/// ("saldo insuficiente"); <b>excecao</b> apenas para o que e realmente excepcional
+/// (banco fora do ar, bug).
+/// </para>
+/// </remarks>
 public class Result
 {
     /// <summary>
-    /// Initializes a new result instance.
+    /// Inicializa um resultado.
     /// </summary>
-    /// <param name="isSuccess">Indicates whether the operation succeeded.</param>
-    /// <param name="error">The failure message when the operation does not succeed.</param>
+    /// <param name="isSuccess">Indica se a operacao teve sucesso.</param>
+    /// <param name="error">Mensagem de falha, quando houver.</param>
     protected Result(bool isSuccess, string? error)
     {
         IsSuccess = isSuccess;
@@ -17,33 +30,38 @@ public class Result
     }
 
     /// <summary>
-    /// Gets a value indicating whether the operation completed successfully.
+    /// Indica que a operacao terminou com sucesso.
     /// </summary>
     public bool IsSuccess { get; }
 
     /// <summary>
-    /// Gets the error message when the operation fails.
+    /// Indica que a operacao falhou. Acucar sintatico para <c>!IsSuccess</c>.
+    /// </summary>
+    public bool IsFailure => !IsSuccess;
+
+    /// <summary>
+    /// Motivo da falha; <see langword="null"/> quando a operacao teve sucesso.
     /// </summary>
     public string? Error { get; }
 
     /// <summary>
-    /// Creates a successful result.
+    /// Cria um resultado de sucesso.
     /// </summary>
-    /// <returns>A successful result instance.</returns>
+    /// <returns>Resultado bem-sucedido.</returns>
     public static Result Success() => new(true, null);
 
     /// <summary>
-    /// Creates a failed result.
+    /// Cria um resultado de falha.
     /// </summary>
-    /// <param name="error">The failure reason.</param>
-    /// <returns>A failed result instance.</returns>
+    /// <param name="error">Motivo da falha.</param>
+    /// <returns>Resultado com falha.</returns>
     public static Result Failure(string error) => new(false, error);
 }
 
 /// <summary>
-/// Represents the result of an operation that returns a value.
+/// Resultado de uma operacao que devolve um valor quando bem-sucedida.
 /// </summary>
-/// <typeparam name="T">The type of the returned value.</typeparam>
+/// <typeparam name="T">Tipo do valor retornado.</typeparam>
 public sealed class Result<T> : Result
 {
     private Result(bool isSuccess, T? value, string? error)
@@ -53,21 +71,26 @@ public sealed class Result<T> : Result
     }
 
     /// <summary>
-    /// Gets the operation value when the result is successful.
+    /// Valor produzido pela operacao; <see langword="null"/> quando houve falha.
     /// </summary>
     public T? Value { get; }
 
     /// <summary>
-    /// Creates a successful result with a value.
+    /// Cria um resultado de sucesso carregando o valor.
     /// </summary>
-    /// <param name="value">The value returned by the operation.</param>
-    /// <returns>A successful result instance.</returns>
+    /// <param name="value">Valor retornado pela operacao.</param>
+    /// <returns>Resultado bem-sucedido.</returns>
     public static Result<T> Success(T value) => new(true, value, null);
 
     /// <summary>
-    /// Creates a failed result with no value.
+    /// Cria um resultado de falha, sem valor.
     /// </summary>
-    /// <param name="error">The failure reason.</param>
-    /// <returns>A failed result instance.</returns>
+    /// <param name="error">Motivo da falha.</param>
+    /// <returns>Resultado com falha.</returns>
+    /// <remarks>
+    /// O <c>new</c> aqui esconde <see cref="Result.Failure(string)"/> de proposito:
+    /// sem ele, <c>Result&lt;Order&gt;.Failure("x")</c> devolveria um <c>Result</c>
+    /// sem o tipo generico e nao compilaria no ponto de uso.
+    /// </remarks>
     public static new Result<T> Failure(string error) => new(false, default, error);
 }

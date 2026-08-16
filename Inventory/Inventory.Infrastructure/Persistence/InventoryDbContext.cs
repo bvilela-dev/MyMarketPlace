@@ -4,13 +4,13 @@ using Microsoft.EntityFrameworkCore;
 namespace Inventory.Infrastructure.Persistence;
 
 /// <summary>
-/// EF Core DbContext for inventory data.
+/// Contexto do EF Core do banco do Inventory.
 /// </summary>
-/// <param name="options">The DbContext options.</param>
+/// <param name="options">Opcoes de configuracao do contexto.</param>
 public sealed class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : DbContext(options)
 {
     /// <summary>
-    /// Gets the stock items set.
+    /// Saldos de estoque por produto.
     /// </summary>
     public DbSet<StockItem> StockItems => Set<StockItem>();
 

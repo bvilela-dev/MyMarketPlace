@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Testes de dominio e casos de uso do Catalog. -->
+
+  <ItemGroup>
+    <!--
+      xUnit v3 traz o proprio runner (Microsoft.Testing.Platform), entao nao precisa
+      de Microsoft.NET.Test.Sdk nem do adaptador do VSTest — que, alias, deixou de
+      ser suportado pelo `dotnet test` a partir do SDK do .NET 10.
+    -->
+    <PackageReference Include="xunit.v3" />
+    <!-- Dubles de teste (mocks/stubs) para isolar o codigo sob teste. -->
+    <PackageReference Include="NSubstitute" />
+    <!-- Asserts legiveis; BSD, sem a restricao de licenca comercial do FluentAssertions 8. -->
+    <PackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Catalog\Catalog.Application\Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\Catalog\Catalog.Domain\Catalog.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,10 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!-- Camada de infraestrutura do Payment: conexao Redis para idempotencia. -->
 
   <ItemGroup>
     <ProjectReference Include="..\Payment.Application\Payment.Application.csproj" />

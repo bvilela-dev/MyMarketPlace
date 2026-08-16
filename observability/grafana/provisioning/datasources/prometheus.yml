@@ -1,0 +1,15 @@
+# Provisionamento automatico da fonte de dados do Grafana.
+#
+# Sem este arquivo, toda demonstracao comecaria com "Configuration > Data sources >
+# Add data source > ...". Provisionar por arquivo tambem deixa a configuracao
+# versionada no Git, em vez de presa no banco interno do Grafana.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # Nome do servico na rede do Docker Compose / Kubernetes.
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true

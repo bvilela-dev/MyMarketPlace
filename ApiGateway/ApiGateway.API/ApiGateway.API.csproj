@@ -1,14 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
+  <!--
+    Gateway com YARP. Projeto unico, sem as camadas Domain/Application/Infrastructure:
+    um reverse proxy nao tem regra de negocio, e criar tres projetos vazios apenas para
+    manter simetria visual com os demais servicos seria cerimonia sem conteudo.
+  -->
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-    <PackageReference Include="Swashbuckle.AspNetCore" />
     <PackageReference Include="Yarp.ReverseProxy" />
   </ItemGroup>
 

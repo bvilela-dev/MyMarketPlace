@@ -1,17 +1,30 @@
 namespace Marketplace.Contracts.Grpc;
 
 /// <summary>
-/// Represents the result of validating a user and address pair through gRPC.
+/// Resultado da validacao de um par usuario/endereco feita pelo Identity via gRPC.
 /// </summary>
-/// <param name="IsValid">Indicates whether the user and address are valid.</param>
-/// <param name="UserId">The validated user identifier.</param>
-/// <param name="AddressId">The validated address identifier.</param>
-/// <param name="Street">The address street.</param>
-/// <param name="Number">The address number.</param>
-/// <param name="City">The address city.</param>
-/// <param name="State">The address state.</param>
-/// <param name="ZipCode">The address postal code.</param>
-/// <param name="Country">The address country.</param>
+/// <remarks>
+/// <para>
+/// <b>Por que gRPC e nao um evento aqui?</b> Porque o Order precisa da resposta
+/// <i>antes</i> de decidir se cria o pedido — e uma pergunta sincrona, nao uma
+/// notificacao. A regra pratica usada no projeto: comunicacao sincrona (gRPC) para
+/// consulta que bloqueia a decisao; assincrona (eventos) para propagar fatos ja
+/// consumados.
+/// </para>
+/// <para>
+/// Quando valido, a resposta ja traz os campos do endereco, evitando uma segunda
+/// chamada so para busca-los.
+/// </para>
+/// </remarks>
+/// <param name="IsValid">Indica se o usuario existe e o endereco pertence a ele.</param>
+/// <param name="UserId">Identificador do usuario validado.</param>
+/// <param name="AddressId">Identificador do endereco validado.</param>
+/// <param name="Street">Logradouro.</param>
+/// <param name="Number">Numero.</param>
+/// <param name="City">Cidade.</param>
+/// <param name="State">Estado ou provincia.</param>
+/// <param name="ZipCode">CEP.</param>
+/// <param name="Country">Pais.</param>
 public sealed record UserAddressValidationDto(
     bool IsValid,
     Guid UserId,

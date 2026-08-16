@@ -3,15 +3,18 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Notification.Application;
 
 /// <summary>
-/// Provides dependency injection registration for the Notification application layer.
+/// Registro dos servicos da camada de aplicacao do Notification.
 /// </summary>
 public static class DependencyInjection
 {
     /// <summary>
-    /// Registers Notification application services.
+    /// Ponto de extensao da camada de aplicacao do Notification.
     /// </summary>
-    /// <param name="services">The service collection being configured.</param>
-    /// <returns>The updated <see cref="IServiceCollection"/>.</returns>
-    public static IServiceCollection AddApplication(this IServiceCollection services)
-        => services;
+    /// <remarks>
+    /// Servico puramente reativo: os consumidores sao registrados no MassTransit e nao
+    /// ha caso de uso sincrono. O metodo mantem o formato de composicao dos demais.
+    /// </remarks>
+    /// <param name="services">Container de servicos.</param>
+    /// <returns>O proprio <see cref="IServiceCollection"/>.</returns>
+    public static IServiceCollection AddApplication(this IServiceCollection services) => services;
 }

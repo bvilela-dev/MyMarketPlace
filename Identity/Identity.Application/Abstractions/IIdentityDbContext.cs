@@ -5,34 +5,49 @@ using Microsoft.EntityFrameworkCore;
 namespace Identity.Application.Abstractions;
 
 /// <summary>
-/// Defines the persistence contract used by the Identity application layer.
+/// Contrato de persistencia usado pelos casos de uso do Identity.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Por que uma interface e nao o <c>DbContext</c> concreto?</b> Para que os handlers
+/// dependam de uma abstracao e possam ser testados com um contexto em memoria, sem
+/// Postgres. E a mesma ideia do padrao Repository, mas sem a camada extra: os
+/// <c>DbSet</c> ja sao repositorios (<c>IQueryable</c>) e <c>SaveChangesAsync</c> ja e
+/// o Unit of Work.
+/// </para>
+/// <para>
+/// <b>Compromisso assumido:</b> a interface expoe tipos do EF Core, entao a camada de
+/// aplicacao nao esta 100% isolada do ORM. E uma troca consciente — a alternativa
+/// (repositorios manuais para tudo) custa muito codigo repetitivo para proteger de uma
+/// troca de ORM que quase nunca acontece.
+/// </para>
+/// </remarks>
 public interface IIdentityDbContext
 {
     /// <summary>
-    /// Gets the users set.
+    /// Usuarios cadastrados.
     /// </summary>
     DbSet<User> Users { get; }
 
     /// <summary>
-    /// Gets the refresh tokens set.
+    /// Refresh tokens emitidos.
     /// </summary>
     DbSet<RefreshToken> RefreshTokens { get; }
 
     /// <summary>
-    /// Gets the addresses set.
+    /// Enderecos dos usuarios.
     /// </summary>
     DbSet<Address> Addresses { get; }
 
     /// <summary>
-    /// Gets the outbox messages set.
+    /// Eventos de integracao pendentes de publicacao (outbox).
     /// </summary>
     DbSet<OutboxMessage> OutboxMessages { get; }
 
     /// <summary>
-    /// Persists pending changes.
+    /// Confirma as alteracoes pendentes numa unica transacao.
     /// </summary>
-    /// <param name="cancellationToken">The request cancellation token.</param>
-    /// <returns>The number of persisted state entries.</returns>
+    /// <param name="cancellationToken">Token de cancelamento da requisicao.</param>
+    /// <returns>Quantidade de registros afetados.</returns>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

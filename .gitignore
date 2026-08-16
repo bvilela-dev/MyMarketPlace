@@ -1,8 +1,36 @@
+# Saidas de build
 bin/
 obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+TestResults/
+coverage*.xml
+*.coverage
+
+# IDEs
 .vs/
 .vscode/
-.DS_Store
+.idea/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Bancos locais
 *.db
+*.db-shm
+*.db-wal
+
+# Segredos: nunca versionar.
+# Em desenvolvimento, use `dotnet user-secrets` (guarda fora da pasta do projeto).
+# Em producao, variaveis de ambiente vindas de um cofre de segredos.
+appsettings.Local.json
+appsettings.*.Local.json
+*.pfx
+.env
+.env.*

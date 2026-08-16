@@ -1,13 +1,46 @@
+# =============================================================================
+# OpenTelemetry Collector — ponto unico de coleta de telemetria.
+#
+# Por que existe uma camada intermediaria em vez de cada servico exportar direto
+# para o Prometheus/Jaeger?
+#
+#   1. As aplicacoes falam UM protocolo (OTLP) e nao conhecem o backend. Trocar
+#      Jaeger por Tempo, ou Prometheus por Mimir, e mudanca so neste arquivo.
+#   2. Processamento central: amostragem, filtro de dados sensiveis e atributos
+#      comuns ficam num lugar so, sem redeploy dos servicos.
+#   3. Buffer: o collector absorve indisponibilidade do backend, evitando que a
+#      exportacao de telemetria vire latencia dentro da aplicacao.
+# =============================================================================
+
 receivers:
   otlp:
     protocols:
       grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
 
 processors:
+  # Agrupa telemetria antes de exportar. Reduz drasticamente o numero de
+  # requisicoes de rede — sem isso, cada span viraria uma chamada.
   batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+  # Trava de seguranca: se o collector passar do limite de memoria, ele comeca a
+  # descartar dados em vez de ser morto pelo OOM killer. Perder telemetria e
+  # ruim; perder o collector inteiro (e toda a telemetria) e pior.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
 
 exporters:
+  # Imprime os traces no log do proprio collector. Otimo para demonstracao;
+  # em producao seria substituido por Jaeger, Tempo ou equivalente.
   debug:
+    verbosity: normal
+
   prometheus:
     endpoint: "0.0.0.0:8889"
 
@@ -15,9 +48,17 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      # A ordem importa: memory_limiter SEMPRE primeiro, para poder descartar
+      # dados antes de eles ocuparem memoria no batch.
+      processors: [memory_limiter, batch]
       exporters: [debug]
+
     metrics:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [prometheus]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

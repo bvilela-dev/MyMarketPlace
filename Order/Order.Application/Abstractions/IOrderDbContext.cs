@@ -1,28 +1,27 @@
 using Marketplace.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Order.Domain.Entities;
 
 namespace Order.Application.Abstractions;
 
 /// <summary>
-/// Defines persistence operations required by the Order application layer.
+/// Contrato de persistencia usado pelos casos de uso e consumidores do Order.
 /// </summary>
 public interface IOrderDbContext
 {
     /// <summary>
-    /// Gets the orders set.
+    /// Pedidos.
     /// </summary>
-    DbSet<Order.Domain.Entities.Order> Orders { get; }
+    DbSet<Domain.Entities.Order> Orders { get; }
 
     /// <summary>
-    /// Gets the outbox messages set.
+    /// Eventos de integracao pendentes de publicacao (outbox).
     /// </summary>
     DbSet<OutboxMessage> OutboxMessages { get; }
 
     /// <summary>
-    /// Persists pending changes.
+    /// Confirma as alteracoes pendentes numa unica transacao.
     /// </summary>
-    /// <param name="cancellationToken">The request cancellation token.</param>
-    /// <returns>The number of affected records.</returns>
+    /// <param name="cancellationToken">Token de cancelamento da requisicao.</param>
+    /// <returns>Quantidade de registros afetados.</returns>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

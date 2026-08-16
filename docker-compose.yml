@@ -1,16 +1,101 @@
-version: "3.9"
+# =============================================================================
+# MyMarketPlace — ambiente completo em containers.
+#
+#   docker compose up -d --build        sobe tudo
+#   docker compose logs -f order-api    acompanha um servico
+#   docker compose down -v              derruba e apaga os volumes
+#
+# Gateway:    http://localhost:5000
+# RabbitMQ:   http://localhost:15672   (guest / guest)
+# Grafana:    http://localhost:3000    (admin / admin)
+# Prometheus: http://localhost:9090
+#
+# NOTA IMPORTANTE (bug corrigido): antes, os containers das APIs subiam sem
+# nenhuma variavel de ambiente e acabavam usando o appsettings.json, que aponta
+# para "localhost". Dentro de um container, localhost e o proprio container — nao
+# o Postgres. Ou seja: `docker compose up` subia sete servicos que nao conectavam
+# em nada. Cada servico agora recebe explicitamente os enderecos da rede do Compose.
+# =============================================================================
+
+# Blocos reutilizaveis (YAML anchors) — evitam repetir as mesmas 6 linhas em 7 servicos.
+x-otlp: &otlp
+  OpenTelemetry__OtlpEndpoint: http://otel-collector:4317
+
+x-jwt: &jwt
+  # Todos os servicos que VALIDAM token precisam do mesmo segredo usado para assina-lo.
+  # Em producao isto vem de um cofre de segredos, nunca de um arquivo versionado.
+  Jwt__Issuer: marketplace.identity
+  Jwt__Audience: marketplace.clients
+  Jwt__Secret: docker-compose-secret-change-me-at-least-32-bytes
+
+x-rabbit: &rabbit
+  ConnectionStrings__RabbitMq: rabbitmq://guest:guest@rabbitmq:5672
+
+x-redis: &redis
+  ConnectionStrings__Redis: redis:6379
+
+x-aspnet: &aspnet
+  ASPNETCORE_URLS: http://+:8080
+  ASPNETCORE_ENVIRONMENT: Development
+
+# ---------------------------------------------------------------------------
+# Servicos que expoem gRPC (Identity e Catalog) precisam de DUAS portas.
+#
+# Motivo tecnico, e uma pegadinha classica: sem TLS nao existe negociacao ALPN,
+# entao um endpoint marcado como "Http1AndHttp2" simplesmente atende em HTTP/1.1.
+# O cliente gRPC exige HTTP/2 e o servidor responde HTTP_1_1_REQUIRED (0xd) —
+# erro que so aparece em runtime, na primeira chamada entre servicos.
+#
+# A solucao e um endpoint por protocolo:
+#   8080 -> REST  (Http1AndHttp2)
+#   8081 -> gRPC  (Http2, prior knowledge)
+#
+# Em producao, com TLS ponta a ponta, o ALPN resolveria a negociacao e uma unica
+# porta bastaria.
+# ---------------------------------------------------------------------------
+x-grpc-endpoints: &grpc-endpoints
+  Kestrel__Endpoints__Http__Url: http://+:8080
+  Kestrel__Endpoints__Http__Protocols: Http1AndHttp2
+  Kestrel__Endpoints__Grpc__Url: http://+:8081
+  Kestrel__Endpoints__Grpc__Protocols: Http2
+
+x-api-healthcheck: &api-healthcheck
+  # A imagem oficial do ASP.NET nao traz curl nem wget (superficie de ataque menor).
+  # A alternativa sem instalar nada e o /dev/tcp do bash, que abre um socket direto
+  # e permite falar HTTP na mao. Precisa ser ["CMD", "bash", ...] e nao CMD-SHELL,
+  # porque o shell padrao do container e o dash, que nao suporta /dev/tcp.
+  test:
+    - CMD
+    - bash
+    - -c
+    - "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/live HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && head -1 <&3 | grep -q 200"
+  interval: 15s
+  timeout: 3s
+  retries: 10
+  start_period: 40s
 
 services:
+  # ===========================================================================
+  # Plataforma
+  # ===========================================================================
+
+  # Um banco por microsservico (database-per-service). Nenhum servico le a tabela
+  # do outro — a troca de dados acontece por API ou por evento.
   postgres-identity:
     image: postgres:17
     environment:
       POSTGRES_DB: identitydb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - identity-postgres:/var/lib/postgresql/data
+    ports: ["5432:5432"]
+    volumes: [identity-postgres:/var/lib/postgresql/data]
+    healthcheck:
+      # pg_isready evita o problema classico: o container "existe" muito antes de o
+      # Postgres aceitar conexao. Sem isso, a API sobe, falha ao migrar e reinicia.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d identitydb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   postgres-catalog:
     image: postgres:17
@@ -18,10 +103,13 @@ services:
       POSTGRES_DB: catalogdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5433:5432"
-    volumes:
-      - catalog-postgres:/var/lib/postgresql/data
+    ports: ["5433:5432"]
+    volumes: [catalog-postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d catalogdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   postgres-order:
     image: postgres:17
@@ -29,10 +117,13 @@ services:
       POSTGRES_DB: orderdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5434:5432"
-    volumes:
-      - order-postgres:/var/lib/postgresql/data
+    ports: ["5434:5432"]
+    volumes: [order-postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orderdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   postgres-inventory:
     image: postgres:17
@@ -40,126 +131,196 @@ services:
       POSTGRES_DB: inventorydb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5435:5432"
-    volumes:
-      - inventory-postgres:/var/lib/postgresql/data
+    ports: ["5435:5432"]
+    volumes: [inventory-postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inventorydb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:7.4
-    ports:
-      - "6379:6379"
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   rabbitmq:
     image: rabbitmq:4-management
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # painel de administracao
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
+  # ===========================================================================
+  # Observabilidade
+  # ===========================================================================
+
+  # O collector e o ponto unico para onde todos os servicos exportam traces,
+  # metricas e logs (OTLP). As aplicacoes nao conhecem Prometheus nem Jaeger:
+  # trocar o backend de observabilidade e mudar so a configuracao do collector.
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.123.0
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
-      - "4317:4317"
-      - "8889:8889"
+      - "4317:4317"   # OTLP gRPC
+      - "8889:8889"   # metricas no formato Prometheus
 
   prometheus:
     image: prom/prometheus:v3.3.1
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    ports:
-      - "9090:9090"
+    ports: ["9090:9090"]
+    depends_on: [otel-collector]
 
   grafana:
     image: grafana/grafana:11.6.1
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
+      # Provisionamento automatico: o Prometheus ja vem cadastrado como fonte de
+      # dados. Sem isso, toda demonstracao comecaria com cliques de configuracao.
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
-    ports:
-      - "3000:3000"
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+
+  # ===========================================================================
+  # Microsservicos
+  # ===========================================================================
 
   identity-api:
     build:
       context: .
       dockerfile: Identity/Identity.API/Dockerfile
-    depends_on:
-      - postgres-identity
-      - rabbitmq
+    environment:
+      <<: [*aspnet, *grpc-endpoints, *otlp, *jwt, *rabbit]
+      ConnectionStrings__Postgres: Host=postgres-identity;Port=5432;Database=identitydb;Username=postgres;Password=postgres
     ports:
-      - "5100:8080"
+      - "5100:8080"   # REST
+      - "5101:8081"   # gRPC
+    depends_on:
+      # service_healthy (e nao apenas service_started): espera o banco ACEITAR
+      # conexao, nao apenas o container existir.
+      postgres-identity: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    healthcheck: *api-healthcheck
 
   catalog-api:
     build:
       context: .
       dockerfile: Catalog/Catalog.API/Dockerfile
-    depends_on:
-      - postgres-catalog
-      - redis
+    environment:
+      <<: [*aspnet, *grpc-endpoints, *otlp, *jwt, *rabbit, *redis]
+      ConnectionStrings__Postgres: Host=postgres-catalog;Port=5432;Database=catalogdb;Username=postgres;Password=postgres
+      # Popula o catalogo de demonstracao na primeira subida.
+      Seed__Enabled: "true"
     ports:
-      - "5200:8080"
+      - "5200:8080"   # REST
+      - "5201:8081"   # gRPC
+    depends_on:
+      postgres-catalog: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    healthcheck: *api-healthcheck
 
   cart-api:
     build:
       context: .
       dockerfile: Cart/Cart.API/Dockerfile
+    environment:
+      <<: [*aspnet, *otlp, *jwt, *redis]
+    ports: ["5300:8080"]
     depends_on:
-      - redis
-    ports:
-      - "5300:8080"
+      redis: {condition: service_healthy}
+    healthcheck: *api-healthcheck
 
   order-api:
     build:
       context: .
       dockerfile: Order/Order.API/Dockerfile
+    environment:
+      <<: [*aspnet, *otlp, *jwt, *rabbit]
+      ConnectionStrings__Postgres: Host=postgres-order;Port=5432;Database=orderdb;Username=postgres;Password=postgres
+      # Enderecos gRPC: porta 8081, dedicada ao HTTP/2 (ver x-grpc-endpoints).
+      Grpc__Identity: http://identity-api:8081
+      Grpc__Catalog: http://catalog-api:8081
+    ports: ["5400:8080"]
     depends_on:
-      - postgres-order
-      - rabbitmq
-    ports:
-      - "5400:8080"
+      postgres-order: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      identity-api: {condition: service_started}
+      catalog-api: {condition: service_started}
+    healthcheck: *api-healthcheck
 
   payment-api:
     build:
       context: .
       dockerfile: Payment/Payment.API/Dockerfile
+    environment:
+      <<: [*aspnet, *otlp, *rabbit, *redis]
+      # Pedidos acima deste valor sao recusados — util para demonstrar o caminho
+      # de compensacao do saga sem alterar codigo.
+      PaymentSimulation__ApprovalLimit: "10000"
+    ports: ["5500:8080"]
     depends_on:
-      - rabbitmq
-      - redis
-    ports:
-      - "5500:8080"
+      rabbitmq: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck: *api-healthcheck
 
   inventory-api:
     build:
       context: .
       dockerfile: Inventory/Inventory.API/Dockerfile
+    environment:
+      <<: [*aspnet, *otlp, *rabbit, *redis]
+      ConnectionStrings__Postgres: Host=postgres-inventory;Port=5432;Database=inventorydb;Username=postgres;Password=postgres
+    ports: ["5600:8080"]
     depends_on:
-      - postgres-inventory
-      - rabbitmq
-      - redis
-    ports:
-      - "5600:8080"
+      postgres-inventory: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck: *api-healthcheck
 
   notification-api:
     build:
       context: .
       dockerfile: Notification/Notification.API/Dockerfile
+    environment:
+      <<: [*aspnet, *otlp, *rabbit, *redis]
+    ports: ["5700:8080"]
     depends_on:
-      - rabbitmq
-      - redis
-    ports:
-      - "5700:8080"
+      rabbitmq: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck: *api-healthcheck
 
-  gateway-api:
+  api-gateway:
     build:
       context: .
       dockerfile: ApiGateway/ApiGateway.API/Dockerfile
+    environment:
+      <<: [*aspnet, *otlp]
+      ReverseProxy__Clusters__identity-cluster__Destinations__d1__Address: http://identity-api:8080/
+      ReverseProxy__Clusters__catalog-cluster__Destinations__d1__Address: http://catalog-api:8080/
+      ReverseProxy__Clusters__cart-cluster__Destinations__d1__Address: http://cart-api:8080/
+      ReverseProxy__Clusters__order-cluster__Destinations__d1__Address: http://order-api:8080/
+    ports: ["5000:8080"]
     depends_on:
-      - identity-api
-      - catalog-api
-      - cart-api
-      - order-api
-    ports:
-      - "5000:8080"
+      identity-api: {condition: service_started}
+      catalog-api: {condition: service_started}
+      cart-api: {condition: service_started}
+      order-api: {condition: service_started}
+    healthcheck: *api-healthcheck
 
 volumes:
   identity-postgres:

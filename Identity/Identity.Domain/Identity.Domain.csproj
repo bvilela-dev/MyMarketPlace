@@ -1,10 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!--
+    Camada de dominio do Identity: entidades, eventos de dominio e regras de
+    negocio puras. A unica dependencia permitida e o SharedKernel.
+  -->
 
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\Marketplace.SharedKernel\Marketplace.SharedKernel.csproj" />

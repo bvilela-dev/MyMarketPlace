@@ -1,20 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
+  <!--
+    Camada de apresentacao do Identity: controllers REST, servico gRPC e o
+    Program.cs que monta o host. Nao contem regra de negocio.
+  -->
 
   <ItemGroup>
     <PackageReference Include="Grpc.AspNetCore" />
     <PackageReference Include="MassTransit" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.OpenApi" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 
@@ -25,6 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- GrpcServices="Server": gera apenas a classe base do servico. O stub de cliente
+         e gerado no Order, a partir do mesmo .proto. -->
     <Protobuf Include="Protos\identity.proto" GrpcServices="Server" />
   </ItemGroup>
 

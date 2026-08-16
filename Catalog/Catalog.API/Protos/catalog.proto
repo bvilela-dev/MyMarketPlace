@@ -4,6 +4,12 @@ option csharp_namespace = "Catalog.API.Grpc";
 
 package catalog;
 
+// Consulta de produtos exposta pelo Catalog aos demais microsservicos.
+//
+// O mesmo arquivo .proto e compilado duas vezes:
+//   * no Catalog.API   -> GrpcServices="Server" (classe base do servico)
+//   * no Order.Infrastructure -> GrpcServices="Client" (stub de cliente)
+// Assim o contrato tem uma unica fonte de verdade, verificada em tempo de compilacao.
 service ProductCatalog {
   rpc GetProduct (GetProductRequest) returns (GetProductResponse);
 }
@@ -16,6 +22,8 @@ message GetProductResponse {
   bool found = 1;
   string product_id = 2;
   string name = 3;
-  double price = 4;
+  // Preco como string, e nao double: protobuf nao possui tipo decimal e ponto
+  // flutuante binario nao representa valores monetarios com exatidao.
+  string price = 4;
   int32 available_quantity = 5;
 }

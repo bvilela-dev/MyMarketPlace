@@ -1,3 +1,16 @@
+# =============================================================================
+# MyMarketPlace — workloads da aplicacao.
+#
+# Aplicar DEPOIS de k8s/platform.yaml (namespace, bancos, RabbitMQ, Redis,
+# collector). Ver README para o passo a passo com k3s.
+#
+# Padrao repetido em todos os Deployments:
+#   * probes de liveness e readiness separadas;
+#   * requests e limits de CPU/memoria;
+#   * configuracao por ConfigMap, segredos por Secret;
+#   * securityContext sem privilegios.
+# =============================================================================
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,6 +19,7 @@ metadata:
 data:
   OTLP_ENDPOINT: http://otel-collector:4317
   ASPNETCORE_URLS: http://+:8080
+  ASPNETCORE_ENVIRONMENT: Production
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -18,49 +32,89 @@ data:
   ReverseProxy__Clusters__cart-cluster__Destinations__d1__Address: http://cart-api:8080/
   ReverseProxy__Clusters__order-cluster__Destinations__d1__Address: http://order-api:8080/
 ---
+# =============================================================================
+# Identity — autenticacao, perfil, enderecos. Expoe REST (8080) e gRPC (8081).
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: identity-api
   namespace: marketplace
+  labels: {app: identity-api, tier: backend}
 spec:
   replicas: 2
   selector:
-    matchLabels:
-      app: identity-api
+    matchLabels: {app: identity-api}
   template:
     metadata:
-      labels:
-        app: identity-api
+      labels: {app: identity-api, tier: backend}
     spec:
+      securityContext:
+        # Impede que o container rode como root mesmo que a imagem tente.
+        runAsNonRoot: true
+        runAsUser: 1654
       containers:
         - name: identity-api
           image: mymarketplace/identity-api:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - {name: http, containerPort: 8080}
+            - {name: grpc, containerPort: 8081}
           env:
-            - name: ASPNETCORE_URLS
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: ASPNETCORE_URLS
-            - name: OpenTelemetry__OtlpEndpoint
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: OTLP_ENDPOINT
-            - name: ConnectionStrings__Postgres
-              value: Host=postgres-identity;Port=5432;Database=identitydb;Username=postgres;Password=postgres
-            - name: ConnectionStrings__RabbitMq
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: RABBITMQ_CONNECTION
-            - name: Jwt__Secret
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: JWT_SECRET
+            - {name: ASPNETCORE_ENVIRONMENT, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_ENVIRONMENT}}}
+            - {name: OpenTelemetry__OtlpEndpoint, valueFrom: {configMapKeyRef: {name: marketplace-config, key: OTLP_ENDPOINT}}}
+            # Duas portas: HTTP/2 sem TLS nao negocia por ALPN, entao o gRPC precisa
+            # de um endpoint proprio marcado explicitamente como Http2.
+            - {name: Kestrel__Endpoints__Http__Url, value: "http://+:8080"}
+            - {name: Kestrel__Endpoints__Http__Protocols, value: "Http1AndHttp2"}
+            - {name: Kestrel__Endpoints__Grpc__Url, value: "http://+:8081"}
+            - {name: Kestrel__Endpoints__Grpc__Protocols, value: "Http2"}
+            - {name: ConnectionStrings__Postgres, value: "Host=postgres-identity;Port=5432;Database=identitydb;Username=postgres;Password=postgres"}
+            - {name: ConnectionStrings__RabbitMq, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: RABBITMQ_CONNECTION}}}
+            - {name: Jwt__Secret, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: JWT_SECRET}}}
+          # ---------------------------------------------------------------
+          # Liveness x readiness: a distincao mais importante das probes.
+          #
+          #  * liveness  = "o processo travou?"  -> falhou, o pod e REINICIADO.
+          #    Nao consulta dependencia alguma. Se apontasse para o banco, uma
+          #    queda momentanea do Postgres reiniciaria todos os pods em
+          #    cascata — transformando indisponibilidade parcial em total.
+          #
+          #  * readiness = "posso receber trafego?" -> falhou, o pod so sai do
+          #    balanceador. Verifica banco e cache; quando a dependencia volta,
+          #    o pod volta a receber trafego sem reiniciar.
+          # ---------------------------------------------------------------
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # startupProbe cobre a partida lenta (migracao do banco) sem precisar
+          # afrouxar a liveness. Ate ela passar, as outras duas ficam suspensas:
+          # 30 x 5s = ate 150s de tolerancia so na inicializacao.
+          startupProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            # requests = o que o scheduler reserva; limits = o teto rigido.
+            #
+            # O request de CPU nao e opcional aqui: o HPA calcula a utilizacao
+            # como uso/request. SEM request definido, nao existe base de calculo
+            # e o autoscaler simplesmente nao funciona.
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities: {drop: ["ALL"]}
 ---
 apiVersion: v1
 kind: Service
@@ -68,11 +122,10 @@ metadata:
   name: identity-api
   namespace: marketplace
 spec:
-  selector:
-    app: identity-api
+  selector: {app: identity-api}
   ports:
-    - port: 8080
-      targetPort: 8080
+    - {name: http, port: 8080, targetPort: http}
+    - {name: grpc, port: 8081, targetPort: grpc}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -80,58 +133,74 @@ metadata:
   name: identity-api
   namespace: marketplace
 spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: identity-api
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: identity-api}
   minReplicas: 2
   maxReplicas: 5
   metrics:
     - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 80}}
+  behavior:
+    scaleDown:
+      # Janela longa na descida evita "flapping": subir e descer replicas a cada
+      # pico curto custa mais (partida a frio) do que manter um pod a mais.
+      stabilizationWindowSeconds: 300
 ---
+# =============================================================================
+# Catalog — vitrine. Expoe REST (8080) e gRPC (8081).
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: catalog-api
   namespace: marketplace
+  labels: {app: catalog-api, tier: backend}
 spec:
   replicas: 2
   selector:
-    matchLabels:
-      app: catalog-api
+    matchLabels: {app: catalog-api}
   template:
     metadata:
-      labels:
-        app: catalog-api
+      labels: {app: catalog-api, tier: backend}
     spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1654}
       containers:
         - name: catalog-api
           image: mymarketplace/catalog-api:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - {name: http, containerPort: 8080}
+            - {name: grpc, containerPort: 8081}
           env:
-            - name: ASPNETCORE_URLS
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: ASPNETCORE_URLS
-            - name: OpenTelemetry__OtlpEndpoint
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: OTLP_ENDPOINT
-            - name: ConnectionStrings__Postgres
-              value: Host=postgres-catalog;Port=5432;Database=catalogdb;Username=postgres;Password=postgres
-            - name: ConnectionStrings__Redis
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: REDIS_CONNECTION
+            - {name: ASPNETCORE_ENVIRONMENT, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_ENVIRONMENT}}}
+            - {name: OpenTelemetry__OtlpEndpoint, valueFrom: {configMapKeyRef: {name: marketplace-config, key: OTLP_ENDPOINT}}}
+            - {name: Kestrel__Endpoints__Http__Url, value: "http://+:8080"}
+            - {name: Kestrel__Endpoints__Http__Protocols, value: "Http1AndHttp2"}
+            - {name: Kestrel__Endpoints__Grpc__Url, value: "http://+:8081"}
+            - {name: Kestrel__Endpoints__Grpc__Protocols, value: "Http2"}
+            - {name: ConnectionStrings__Postgres, value: "Host=postgres-catalog;Port=5432;Database=catalogdb;Username=postgres;Password=postgres"}
+            - {name: ConnectionStrings__Redis, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: REDIS_CONNECTION}}}
+            - {name: ConnectionStrings__RabbitMq, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: RABBITMQ_CONNECTION}}}
+            - {name: Jwt__Secret, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: JWT_SECRET}}}
+            # Popula o catalogo de demonstracao. Em producao ficaria "false".
+            - {name: Seed__Enabled, value: "true"}
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          startupProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
 ---
 apiVersion: v1
 kind: Service
@@ -139,11 +208,10 @@ metadata:
   name: catalog-api
   namespace: marketplace
 spec:
-  selector:
-    app: catalog-api
+  selector: {app: catalog-api}
   ports:
-    - port: 8080
-      targetPort: 8080
+    - {name: http, port: 8080, targetPort: http}
+    - {name: grpc, port: 8081, targetPort: grpc}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -151,56 +219,57 @@ metadata:
   name: catalog-api
   namespace: marketplace
 spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: catalog-api
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: catalog-api}
   minReplicas: 2
   maxReplicas: 5
   metrics:
     - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 80}}
 ---
+# =============================================================================
+# Cart — carrinho em Redis. Sem banco relacional, sem fila.
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cart-api
   namespace: marketplace
+  labels: {app: cart-api, tier: backend}
 spec:
   replicas: 2
   selector:
-    matchLabels:
-      app: cart-api
+    matchLabels: {app: cart-api}
   template:
     metadata:
-      labels:
-        app: cart-api
+      labels: {app: cart-api, tier: backend}
     spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1654}
       containers:
         - name: cart-api
           image: mymarketplace/cart-api:latest
-          ports:
-            - containerPort: 8080
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
           env:
-            - name: ASPNETCORE_URLS
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: ASPNETCORE_URLS
-            - name: OpenTelemetry__OtlpEndpoint
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: OTLP_ENDPOINT
-            - name: ConnectionStrings__Redis
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: REDIS_CONNECTION
+            - {name: ASPNETCORE_URLS, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_URLS}}}
+            - {name: ASPNETCORE_ENVIRONMENT, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_ENVIRONMENT}}}
+            - {name: OpenTelemetry__OtlpEndpoint, valueFrom: {configMapKeyRef: {name: marketplace-config, key: OTLP_ENDPOINT}}}
+            - {name: ConnectionStrings__Redis, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: REDIS_CONNECTION}}}
+            - {name: Jwt__Secret, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: JWT_SECRET}}}
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            # Cart e o servico mais leve: so serializa JSON e fala com o Redis.
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 300m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
 ---
 apiVersion: v1
 kind: Service
@@ -208,11 +277,8 @@ metadata:
   name: cart-api
   namespace: marketplace
 spec:
-  selector:
-    app: cart-api
-  ports:
-    - port: 8080
-      targetPort: 8080
+  selector: {app: cart-api}
+  ports: [{name: http, port: 8080, targetPort: http}]
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -220,62 +286,64 @@ metadata:
   name: cart-api
   namespace: marketplace
 spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: cart-api
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: cart-api}
   minReplicas: 2
   maxReplicas: 5
   metrics:
     - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 80}}
 ---
+# =============================================================================
+# Order — cria pedidos (REST + gRPC de saida) e consome eventos de status.
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: order-api
   namespace: marketplace
+  labels: {app: order-api, tier: backend}
 spec:
   replicas: 2
   selector:
-    matchLabels:
-      app: order-api
+    matchLabels: {app: order-api}
   template:
     metadata:
-      labels:
-        app: order-api
+      labels: {app: order-api, tier: backend}
     spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1654}
       containers:
         - name: order-api
           image: mymarketplace/order-api:latest
-          ports:
-            - containerPort: 8080
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
           env:
-            - name: ASPNETCORE_URLS
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: ASPNETCORE_URLS
-            - name: OpenTelemetry__OtlpEndpoint
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: OTLP_ENDPOINT
-            - name: ConnectionStrings__Postgres
-              value: Host=postgres-order;Port=5432;Database=orderdb;Username=postgres;Password=postgres
-            - name: ConnectionStrings__RabbitMq
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: RABBITMQ_CONNECTION
-            - name: Grpc__Identity
-              value: http://identity-api:8080
-            - name: Grpc__Catalog
-              value: http://catalog-api:8080
+            - {name: ASPNETCORE_URLS, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_URLS}}}
+            - {name: ASPNETCORE_ENVIRONMENT, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_ENVIRONMENT}}}
+            - {name: OpenTelemetry__OtlpEndpoint, valueFrom: {configMapKeyRef: {name: marketplace-config, key: OTLP_ENDPOINT}}}
+            - {name: ConnectionStrings__Postgres, value: "Host=postgres-order;Port=5432;Database=orderdb;Username=postgres;Password=postgres"}
+            - {name: ConnectionStrings__RabbitMq, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: RABBITMQ_CONNECTION}}}
+            - {name: Jwt__Secret, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: JWT_SECRET}}}
+            # Porta 8081: endpoint dedicado a HTTP/2 nos servicos de destino.
+            - {name: Grpc__Identity, value: "http://identity-api:8081"}
+            - {name: Grpc__Catalog, value: "http://catalog-api:8081"}
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          startupProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
 ---
 apiVersion: v1
 kind: Service
@@ -283,11 +351,8 @@ metadata:
   name: order-api
   namespace: marketplace
 spec:
-  selector:
-    app: order-api
-  ports:
-    - port: 8080
-      targetPort: 8080
+  selector: {app: order-api}
+  ports: [{name: http, port: 8080, targetPort: http}]
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -295,61 +360,56 @@ metadata:
   name: order-api
   namespace: marketplace
 spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: order-api
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: order-api}
   minReplicas: 2
   maxReplicas: 5
   metrics:
     - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 80}}
 ---
+# =============================================================================
+# Payment — consumidor puro (sem endpoint de negocio).
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: payment-api
   namespace: marketplace
+  labels: {app: payment-api, tier: worker}
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: payment-api
+    matchLabels: {app: payment-api}
   template:
     metadata:
-      labels:
-        app: payment-api
+      labels: {app: payment-api, tier: worker}
     spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1654}
       containers:
         - name: payment-api
           image: mymarketplace/payment-api:latest
-          ports:
-            - containerPort: 8080
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
           env:
-            - name: ASPNETCORE_URLS
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: ASPNETCORE_URLS
-            - name: OpenTelemetry__OtlpEndpoint
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: OTLP_ENDPOINT
-            - name: ConnectionStrings__RabbitMq
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: RABBITMQ_CONNECTION
-            - name: ConnectionStrings__Redis
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: REDIS_CONNECTION
+            - {name: ASPNETCORE_URLS, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_URLS}}}
+            - {name: ASPNETCORE_ENVIRONMENT, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_ENVIRONMENT}}}
+            - {name: OpenTelemetry__OtlpEndpoint, valueFrom: {configMapKeyRef: {name: marketplace-config, key: OTLP_ENDPOINT}}}
+            - {name: ConnectionStrings__RabbitMq, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: RABBITMQ_CONNECTION}}}
+            - {name: ConnectionStrings__Redis, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: REDIS_CONNECTION}}}
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 300m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
 ---
 apiVersion: v1
 kind: Service
@@ -357,75 +417,73 @@ metadata:
   name: payment-api
   namespace: marketplace
 spec:
-  selector:
-    app: payment-api
-  ports:
-    - port: 8080
-      targetPort: 8080
+  selector: {app: payment-api}
+  ports: [{name: http, port: 8080, targetPort: http}]
 ---
+# HPA por CPU num consumidor de fila e um proxy imperfeito: o sinal correto seria
+# o tamanho da fila (via KEDA, por exemplo), que mede o trabalho ACUMULADO em vez
+# do consumo instantaneo. Fica como CPU aqui por nao depender de operador extra.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: payment-api
   namespace: marketplace
 spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: payment-api
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: payment-api}
   minReplicas: 1
   maxReplicas: 3
   metrics:
     - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 80}}
 ---
+# =============================================================================
+# Inventory — dono do estoque. Consumidor com banco proprio.
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: inventory-api
   namespace: marketplace
+  labels: {app: inventory-api, tier: worker}
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: inventory-api
+    matchLabels: {app: inventory-api}
   template:
     metadata:
-      labels:
-        app: inventory-api
+      labels: {app: inventory-api, tier: worker}
     spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1654}
       containers:
         - name: inventory-api
           image: mymarketplace/inventory-api:latest
-          ports:
-            - containerPort: 8080
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
           env:
-            - name: ASPNETCORE_URLS
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: ASPNETCORE_URLS
-            - name: OpenTelemetry__OtlpEndpoint
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: OTLP_ENDPOINT
-            - name: ConnectionStrings__Postgres
-              value: Host=postgres-inventory;Port=5432;Database=inventorydb;Username=postgres;Password=postgres
-            - name: ConnectionStrings__RabbitMq
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: RABBITMQ_CONNECTION
-            - name: ConnectionStrings__Redis
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: REDIS_CONNECTION
+            - {name: ASPNETCORE_URLS, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_URLS}}}
+            - {name: ASPNETCORE_ENVIRONMENT, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_ENVIRONMENT}}}
+            - {name: OpenTelemetry__OtlpEndpoint, valueFrom: {configMapKeyRef: {name: marketplace-config, key: OTLP_ENDPOINT}}}
+            - {name: ConnectionStrings__Postgres, value: "Host=postgres-inventory;Port=5432;Database=inventorydb;Username=postgres;Password=postgres"}
+            - {name: ConnectionStrings__RabbitMq, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: RABBITMQ_CONNECTION}}}
+            - {name: ConnectionStrings__Redis, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: REDIS_CONNECTION}}}
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          startupProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
 ---
 apiVersion: v1
 kind: Service
@@ -433,73 +491,52 @@ metadata:
   name: inventory-api
   namespace: marketplace
 spec:
-  selector:
-    app: inventory-api
-  ports:
-    - port: 8080
-      targetPort: 8080
+  selector: {app: inventory-api}
+  ports: [{name: http, port: 8080, targetPort: http}]
 ---
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: inventory-api
-  namespace: marketplace
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: inventory-api
-  minReplicas: 1
-  maxReplicas: 3
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
----
+# =============================================================================
+# Notification — um consumidor por evento.
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: notification-api
   namespace: marketplace
+  labels: {app: notification-api, tier: worker}
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: notification-api
+    matchLabels: {app: notification-api}
   template:
     metadata:
-      labels:
-        app: notification-api
+      labels: {app: notification-api, tier: worker}
     spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1654}
       containers:
         - name: notification-api
           image: mymarketplace/notification-api:latest
-          ports:
-            - containerPort: 8080
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
           env:
-            - name: ASPNETCORE_URLS
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: ASPNETCORE_URLS
-            - name: OpenTelemetry__OtlpEndpoint
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: OTLP_ENDPOINT
-            - name: ConnectionStrings__RabbitMq
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: RABBITMQ_CONNECTION
-            - name: ConnectionStrings__Redis
-              valueFrom:
-                secretKeyRef:
-                  name: marketplace-secrets
-                  key: REDIS_CONNECTION
+            - {name: ASPNETCORE_URLS, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_URLS}}}
+            - {name: ASPNETCORE_ENVIRONMENT, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_ENVIRONMENT}}}
+            - {name: OpenTelemetry__OtlpEndpoint, valueFrom: {configMapKeyRef: {name: marketplace-config, key: OTLP_ENDPOINT}}}
+            - {name: ConnectionStrings__RabbitMq, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: RABBITMQ_CONNECTION}}}
+            - {name: ConnectionStrings__Redis, valueFrom: {secretKeyRef: {name: marketplace-secrets, key: REDIS_CONNECTION}}}
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 300m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
 ---
 apiVersion: v1
 kind: Service
@@ -507,83 +544,58 @@ metadata:
   name: notification-api
   namespace: marketplace
 spec:
-  selector:
-    app: notification-api
-  ports:
-    - port: 8080
-      targetPort: 8080
+  selector: {app: notification-api}
+  ports: [{name: http, port: 8080, targetPort: http}]
 ---
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: notification-api
-  namespace: marketplace
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: notification-api
-  minReplicas: 1
-  maxReplicas: 3
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
----
+# =============================================================================
+# API Gateway — unica porta de entrada.
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api-gateway
   namespace: marketplace
+  labels: {app: api-gateway, tier: edge}
 spec:
   replicas: 2
   selector:
-    matchLabels:
-      app: api-gateway
+    matchLabels: {app: api-gateway}
   template:
     metadata:
-      labels:
-        app: api-gateway
+      labels: {app: api-gateway, tier: edge}
     spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1654}
       containers:
         - name: api-gateway
           image: mymarketplace/api-gateway:latest
-          ports:
-            - containerPort: 8080
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
           env:
-            - name: ASPNETCORE_URLS
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: ASPNETCORE_URLS
-            - name: OpenTelemetry__OtlpEndpoint
-              valueFrom:
-                configMapKeyRef:
-                  name: marketplace-config
-                  key: OTLP_ENDPOINT
+            - {name: ASPNETCORE_URLS, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_URLS}}}
+            - {name: ASPNETCORE_ENVIRONMENT, valueFrom: {configMapKeyRef: {name: marketplace-config, key: ASPNETCORE_ENVIRONMENT}}}
+            - {name: OpenTelemetry__OtlpEndpoint, valueFrom: {configMapKeyRef: {name: marketplace-config, key: OTLP_ENDPOINT}}}
             - name: ReverseProxy__Clusters__identity-cluster__Destinations__d1__Address
-              valueFrom:
-                configMapKeyRef:
-                  name: api-gateway-config
-                  key: ReverseProxy__Clusters__identity-cluster__Destinations__d1__Address
+              valueFrom: {configMapKeyRef: {name: api-gateway-config, key: ReverseProxy__Clusters__identity-cluster__Destinations__d1__Address}}
             - name: ReverseProxy__Clusters__catalog-cluster__Destinations__d1__Address
-              valueFrom:
-                configMapKeyRef:
-                  name: api-gateway-config
-                  key: ReverseProxy__Clusters__catalog-cluster__Destinations__d1__Address
+              valueFrom: {configMapKeyRef: {name: api-gateway-config, key: ReverseProxy__Clusters__catalog-cluster__Destinations__d1__Address}}
             - name: ReverseProxy__Clusters__cart-cluster__Destinations__d1__Address
-              valueFrom:
-                configMapKeyRef:
-                  name: api-gateway-config
-                  key: ReverseProxy__Clusters__cart-cluster__Destinations__d1__Address
+              valueFrom: {configMapKeyRef: {name: api-gateway-config, key: ReverseProxy__Clusters__cart-cluster__Destinations__d1__Address}}
             - name: ReverseProxy__Clusters__order-cluster__Destinations__d1__Address
-              valueFrom:
-                configMapKeyRef:
-                  name: api-gateway-config
-                  key: ReverseProxy__Clusters__order-cluster__Destinations__d1__Address
+              valueFrom: {configMapKeyRef: {name: api-gateway-config, key: ReverseProxy__Clusters__order-cluster__Destinations__d1__Address}}
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 96Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
 ---
 apiVersion: v1
 kind: Service
@@ -591,11 +603,8 @@ metadata:
   name: api-gateway
   namespace: marketplace
 spec:
-  selector:
-    app: api-gateway
-  ports:
-    - port: 8080
-      targetPort: 8080
+  selector: {app: api-gateway}
+  ports: [{name: http, port: 8080, targetPort: http}]
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -603,16 +612,26 @@ metadata:
   name: api-gateway
   namespace: marketplace
 spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: api-gateway
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: api-gateway}
   minReplicas: 2
   maxReplicas: 5
   metrics:
     - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 80}}
+---
+# =============================================================================
+# PodDisruptionBudget do gateway.
+#
+# Garante que uma manutencao planejada do cluster (drain de no, upgrade) nunca
+# derrube a unica porta de entrada do sistema: pelo menos 1 pod fica de pe.
+# Sem PDB, o Kubernetes pode evacuar os dois de uma vez.
+# =============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway
+  namespace: marketplace
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app: api-gateway}

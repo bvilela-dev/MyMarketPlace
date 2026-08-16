@@ -1,23 +1,31 @@
+using Catalog.Application.Abstractions;
 using Catalog.Domain.Entities;
+using Marketplace.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Catalog.Infrastructure.Persistence;
 
 /// <summary>
-/// EF Core DbContext for catalog data.
+/// Contexto do EF Core do banco do Catalog.
 /// </summary>
-/// <param name="options">The DbContext options.</param>
-public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options) : DbContext(options)
+/// <param name="options">Opcoes de configuracao do contexto.</param>
+public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options) : DbContext(options), ICatalogDbContext
 {
     /// <summary>
-    /// Gets the products set.
+    /// Produtos do catalogo.
     /// </summary>
     public DbSet<Product> Products => Set<Product>();
+
+    /// <summary>
+    /// Eventos de integracao pendentes (outbox).
+    /// </summary>
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CatalogDbContext).Assembly);
+        modelBuilder.ApplyOutboxConfiguration();
         base.OnModelCreating(modelBuilder);
     }
 }

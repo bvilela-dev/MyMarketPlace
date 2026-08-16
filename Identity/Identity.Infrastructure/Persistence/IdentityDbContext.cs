@@ -6,35 +6,47 @@ using Microsoft.EntityFrameworkCore;
 namespace Identity.Infrastructure.Persistence;
 
 /// <summary>
-/// EF Core DbContext for Identity data.
+/// Contexto do EF Core do banco do Identity.
 /// </summary>
-/// <param name="options">The DbContext options.</param>
-public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : DbContext(options), IIdentityDbContextAdapter
+/// <remarks>
+/// Cada microsservico tem o <b>seu proprio banco</b> (database-per-service). Nenhum
+/// servico le a tabela do outro: a troca de dados acontece por API ou por evento. E o
+/// que permite ao Identity mudar seu esquema sem quebrar Order, Cart ou Catalog.
+/// </remarks>
+/// <param name="options">Opcoes de configuracao do contexto.</param>
+public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : DbContext(options), IIdentityDbContext
 {
     /// <summary>
-    /// Gets the users set.
+    /// Usuarios cadastrados.
     /// </summary>
     public DbSet<User> Users => Set<User>();
 
     /// <summary>
-    /// Gets the refresh tokens set.
+    /// Refresh tokens emitidos.
     /// </summary>
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     /// <summary>
-    /// Gets the addresses set.
+    /// Enderecos dos usuarios.
     /// </summary>
     public DbSet<Address> Addresses => Set<Address>();
 
     /// <summary>
-    /// Gets the outbox messages set.
+    /// Eventos de integracao pendentes (outbox).
     /// </summary>
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Varre o assembly em busca de IEntityTypeConfiguration<T>. Assim cada entidade
+        // tem seu mapeamento num arquivo proprio, em vez de um OnModelCreating gigante.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
+
+        // O mapeamento do outbox vive nos building blocks e precisa ser aplicado a mao:
+        // ApplyConfigurationsFromAssembly so enxerga o assembly deste servico.
+        modelBuilder.ApplyOutboxConfiguration();
+
         base.OnModelCreating(modelBuilder);
     }
 }

@@ -1,23 +1,54 @@
+using Marketplace.SharedKernel.Exceptions;
+
 namespace Order.Domain.Entities;
 
 /// <summary>
-/// Represents an item inside an order.
+/// Item de um pedido.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Por que nome e preco sao copiados do catalogo em vez de referenciados?</b>
+/// Porque o pedido precisa ser um registro historico fiel. Se o item apontasse para o
+/// produto, uma mudanca de preco amanha reescreveria o valor de todos os pedidos
+/// antigos — e a nota fiscal deixaria de bater com o que o cliente realmente pagou.
+/// </para>
+/// <para>
+/// Esta e a diferenca entre dado <b>transacional</b> (imutavel apos o fato) e dado
+/// <b>mestre</b> (sempre atualizado). Confundir os dois e uma das causas mais comuns de
+/// divergencia contabil em e-commerce.
+/// </para>
+/// </remarks>
 public sealed class OrderItem
 {
+    /// <summary>
+    /// Construtor exigido pelo EF Core.
+    /// </summary>
     private OrderItem()
     {
     }
 
     /// <summary>
-    /// Initializes a new order item.
+    /// Cria um item de pedido.
     /// </summary>
-    /// <param name="productId">The product identifier.</param>
-    /// <param name="name">The product name.</param>
-    /// <param name="unitPrice">The unit price.</param>
-    /// <param name="quantity">The quantity.</param>
+    /// <param name="productId">Identificador do produto comprado.</param>
+    /// <param name="name">Nome do produto no momento da compra.</param>
+    /// <param name="unitPrice">Preco unitario praticado.</param>
+    /// <param name="quantity">Quantidade comprada.</param>
+    /// <exception cref="BusinessRuleException">
+    /// Lancada quando a quantidade nao e positiva ou o preco e negativo.
+    /// </exception>
     public OrderItem(Guid productId, string name, decimal unitPrice, int quantity)
     {
+        if (quantity <= 0)
+        {
+            throw new BusinessRuleException("A quantidade do item deve ser maior que zero.");
+        }
+
+        if (unitPrice < 0)
+        {
+            throw new BusinessRuleException("O preco unitario nao pode ser negativo.");
+        }
+
         Id = Guid.NewGuid();
         ProductId = productId;
         Name = name;
@@ -26,27 +57,36 @@ public sealed class OrderItem
     }
 
     /// <summary>
-    /// Gets the order item identifier.
+    /// Identificador do item.
     /// </summary>
     public Guid Id { get; private set; }
 
     /// <summary>
-    /// Gets the product identifier.
+    /// Produto comprado.
     /// </summary>
     public Guid ProductId { get; private set; }
 
     /// <summary>
-    /// Gets the product name.
+    /// Nome do produto no momento da compra.
     /// </summary>
     public string Name { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Gets the unit price.
+    /// Preco unitario praticado.
     /// </summary>
     public decimal UnitPrice { get; private set; }
 
     /// <summary>
-    /// Gets the quantity.
+    /// Quantidade comprada.
     /// </summary>
     public int Quantity { get; private set; }
+
+    /// <summary>
+    /// Valor total da linha (preco unitario x quantidade).
+    /// </summary>
+    /// <remarks>
+    /// Propriedade calculada, sem coluna correspondente no banco: guardar um valor
+    /// derivado abriria a possibilidade de ele divergir dos campos que o originam.
+    /// </remarks>
+    public decimal LineTotal => UnitPrice * Quantity;
 }

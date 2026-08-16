@@ -1,0 +1,12 @@
+# Carrega automaticamente os dashboards em JSON da pasta montada.
+apiVersion: 1
+
+providers:
+  - name: MyMarketPlace
+    orgId: 1
+    folder: MyMarketPlace
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards

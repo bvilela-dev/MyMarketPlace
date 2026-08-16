@@ -3,16 +3,22 @@ using FluentValidation;
 namespace Identity.Application.Auth;
 
 /// <summary>
-/// Validates login requests.
+/// Regras de validacao do login.
 /// </summary>
 public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
 {
     /// <summary>
-    /// Initializes the validator rules for <see cref="LoginCommand"/>.
+    /// Define as regras de <see cref="LoginCommand"/>.
     /// </summary>
     public LoginCommandValidator()
     {
-        RuleFor(command => command.Email).NotEmpty().EmailAddress();
-        RuleFor(command => command.Password).NotEmpty();
+        RuleFor(command => command.Email)
+            .NotEmpty().WithMessage("O e-mail e obrigatorio.")
+            .EmailAddress().WithMessage("Informe um e-mail valido.");
+
+        // Nao se valida tamanho minimo de senha no login: a regra pode ter mudado desde
+        // o cadastro, e rejeitar aqui bloquearia usuarios antigos legitimos.
+        RuleFor(command => command.Password)
+            .NotEmpty().WithMessage("A senha e obrigatoria.");
     }
 }

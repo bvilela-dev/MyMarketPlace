@@ -1,6 +1,44 @@
-@Cart.API_HostAddress = http://localhost:5279
+### Cart API — carrinho em Redis.
+### O token vem do Identity.API.http.
 
-GET {{Cart.API_HostAddress}}/weatherforecast/
-Accept: application/json
+@host = http://localhost:5300
+@accessToken = COLE_O_TOKEN_AQUI
+@productId = COLE_O_PRODUCT_ID_AQUI
 
-###
+### 1. Gravar carrinho (PUT: substitui o recurso inteiro, idempotente)
+### As duas linhas do mesmo produto sao consolidadas em uma pelo dominio.
+PUT {{host}}/api/carts/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": "{{productId}}", "name": "Produto", "unitPrice": 279.90, "quantity": 1 },
+    { "productId": "{{productId}}", "name": "Produto", "unitPrice": 279.90, "quantity": 1 }
+  ]
+}
+
+### 2. Consultar carrinho
+GET {{host}}/api/carts/me
+Authorization: Bearer {{accessToken}}
+
+### 3. Quantidade invalida -> 400
+PUT {{host}}/api/carts/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": "{{productId}}", "name": "Produto", "unitPrice": 10, "quantity": 0 }
+  ]
+}
+
+### 4. Esvaziar (204 mesmo se ja estiver vazio)
+DELETE {{host}}/api/carts/me
+Authorization: Bearer {{accessToken}}
+
+### 5. Sem token -> 401
+GET {{host}}/api/carts/me
+
+### Saude
+GET {{host}}/health/ready

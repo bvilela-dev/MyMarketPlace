@@ -3,7 +3,7 @@ using MediatR;
 namespace Identity.Application.Auth;
 
 /// <summary>
-/// Represents the request to refresh an expired access token.
+/// Comando de troca de um refresh token por um novo par de tokens.
 /// </summary>
-/// <param name="RefreshToken">The refresh token issued previously.</param>
+/// <param name="RefreshToken">Refresh token recebido na autenticacao anterior.</param>
 public sealed record RefreshTokenCommand(string RefreshToken) : IRequest<AuthResponse>;

@@ -1,14 +1,12 @@
 <Solution>
-  <Folder Name="/ApiGateway/">
-    <Project Path="ApiGateway/ApiGateway.API/ApiGateway.API.csproj" />
-    <Project Path="ApiGateway/ApiGateway.Application/ApiGateway.Application.csproj" />
-    <Project Path="ApiGateway/ApiGateway.Domain/ApiGateway.Domain.csproj" />
-    <Project Path="ApiGateway/ApiGateway.Infrastructure/ApiGateway.Infrastructure.csproj" />
-  </Folder>
   <Folder Name="/BuildingBlocks/">
+    <Project Path="BuildingBlocks/Marketplace.Application/Marketplace.Application.csproj" />
     <Project Path="BuildingBlocks/Marketplace.Contracts/Marketplace.Contracts.csproj" />
     <Project Path="BuildingBlocks/Marketplace.Infrastructure/Marketplace.Infrastructure.csproj" />
     <Project Path="BuildingBlocks/Marketplace.SharedKernel/Marketplace.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/ApiGateway/">
+    <Project Path="ApiGateway/ApiGateway.API/ApiGateway.API.csproj" />
   </Folder>
   <Folder Name="/Cart/">
     <Project Path="Cart/Cart.API/Cart.API.csproj" />
@@ -37,7 +35,6 @@
   <Folder Name="/Notification/">
     <Project Path="Notification/Notification.API/Notification.API.csproj" />
     <Project Path="Notification/Notification.Application/Notification.Application.csproj" />
-    <Project Path="Notification/Notification.Domain/Notification.Domain.csproj" />
     <Project Path="Notification/Notification.Infrastructure/Notification.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/Order/">
@@ -49,7 +46,14 @@
   <Folder Name="/Payment/">
     <Project Path="Payment/Payment.API/Payment.API.csproj" />
     <Project Path="Payment/Payment.Application/Payment.Application.csproj" />
-    <Project Path="Payment/Payment.Domain/Payment.Domain.csproj" />
     <Project Path="Payment/Payment.Infrastructure/Payment.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Marketplace.SharedKernel.Tests/Marketplace.SharedKernel.Tests.csproj" />
+    <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
+    <Project Path="tests/Catalog.UnitTests/Catalog.UnitTests.csproj" />
+    <Project Path="tests/Order.UnitTests/Order.UnitTests.csproj" />
+    <Project Path="tests/Inventory.UnitTests/Inventory.UnitTests.csproj" />
+    <Project Path="tests/Cart.UnitTests/Cart.UnitTests.csproj" />
   </Folder>
 </Solution>

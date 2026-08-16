@@ -1,33 +1,48 @@
+using Grpc.Core;
 using Identity.API.Grpc;
 using Marketplace.Contracts.Grpc;
+using Marketplace.SharedKernel.Exceptions;
 using Order.Application.Abstractions;
 
 namespace Order.Infrastructure.Grpc;
 
 /// <summary>
-/// Implements Identity gRPC calls for the Order service.
+/// Cliente gRPC do Identity usado pelo Order.
 /// </summary>
+/// <param name="client">Stub gRPC gerado a partir de <c>identity.proto</c>.</param>
 public sealed class IdentityGrpcClient(UserValidation.UserValidationClient client) : IIdentityGrpcClient
 {
-    /// <summary>
-    /// Validates the relationship between a user and address through the Identity service.
-    /// </summary>
-    /// <param name="userId">The user identifier.</param>
-    /// <param name="addressId">The address identifier.</param>
-    /// <param name="cancellationToken">The request cancellation token.</param>
-    /// <returns>The validation result.</returns>
+    /// <inheritdoc />
     public async Task<UserAddressValidationDto> ValidateUserAddressAsync(Guid userId, Guid addressId, CancellationToken cancellationToken = default)
     {
-        var response = await client.ValidateUserAddressAsync(new ValidateUserAddressRequest
+        ValidateUserAddressResponse response;
+
+        try
         {
-            UserId = userId.ToString(),
-            AddressId = addressId.ToString()
-        }, cancellationToken: cancellationToken);
+            response = await client.ValidateUserAddressAsync(
+                new ValidateUserAddressRequest
+                {
+                    UserId = userId.ToString(),
+                    AddressId = addressId.ToString()
+                },
+                cancellationToken: cancellationToken);
+        }
+        catch (RpcException exception) when (exception.StatusCode is StatusCode.Unavailable or StatusCode.DeadlineExceeded)
+        {
+            throw new BusinessRuleException("Servico de identidade indisponivel no momento. Tente novamente em instantes.");
+        }
+
+        if (!response.IsValid)
+        {
+            // Resposta "invalida" nao traz os campos do endereco; devolver o DTO com
+            // strings vazias deixa claro que nada deve ser lido dele.
+            return new UserAddressValidationDto(false, userId, addressId, "", "", "", "", "", "");
+        }
 
         return new UserAddressValidationDto(
-            response.IsValid,
-            response.IsValid ? Guid.Parse(response.UserId) : userId,
-            response.IsValid ? Guid.Parse(response.AddressId) : addressId,
+            true,
+            Guid.Parse(response.UserId),
+            Guid.Parse(response.AddressId),
             response.Street,
             response.Number,
             response.City,

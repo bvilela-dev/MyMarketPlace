@@ -4,8 +4,12 @@ using Microsoft.EntityFrameworkCore.Design;
 namespace Order.Infrastructure.Persistence;
 
 /// <summary>
-/// Creates <see cref="OrderDbContext"/> instances for design-time tooling.
+/// Fabrica de <see cref="OrderDbContext"/> para as ferramentas de linha de comando.
 /// </summary>
+/// <remarks>
+/// Usada somente por <c>dotnet ef</c>. A connection string fixa aponta para o ambiente
+/// local e nao tem efeito em runtime.
+/// </remarks>
 public sealed class OrderDbContextFactory : IDesignTimeDbContextFactory<OrderDbContext>
 {
     /// <inheritdoc />

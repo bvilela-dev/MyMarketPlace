@@ -4,38 +4,50 @@ using Inventory.Infrastructure;
 using Inventory.Infrastructure.Persistence;
 using Marketplace.Infrastructure.Messaging;
 using Marketplace.Infrastructure.Observability;
+using Marketplace.Infrastructure.Web;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+
+// ============================================================================
+// Inventory Service — dono da verdade sobre o estoque.
+//
+// Consome:
+//   * ProductCreatedEvent  -> cria o saldo inicial do produto
+//   * PaymentApprovedEvent -> reserva as unidades do pedido
+//
+// Publica:
+//   * StockReservedEvent            (fluxo feliz)
+//   * StockReservationFailedEvent   (compensacao: pago, mas sem estoque)
+// ============================================================================
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMarketplaceTelemetry(builder.Configuration, "inventory-service");
-builder.Services.AddMassTransit(configuration =>
+
+builder.Services.AddMassTransit(bus =>
 {
-    configuration.AddConsumer<PaymentApprovedConsumer>();
-    configuration.ConfigureMarketplaceBus(builder.Configuration);
+    bus.AddConsumer<ProductCreatedConsumer>();
+    bus.AddConsumer<PaymentApprovedConsumer>();
+    bus.ConfigureMarketplaceBus(builder.Configuration, "inventory");
 });
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddMarketplaceHealthChecks()
+    .AddDbContextCheck<InventoryDbContext>()
+    .AddRedisCheck();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseMarketplaceExceptionHandling();
 
-using (var scope = app.Services.CreateScope())
+app.MapMarketplaceHealthEndpoints();
+app.MapGet("/", () => Results.Ok(new { service = "inventory-service" }));
+
+await using (var scope = app.Services.CreateAsyncScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
     await dbContext.Database.MigrateAsync();
 }
 
-app.MapControllers();
-app.MapGet("/", () => Results.Ok(new { service = "inventory-service" }));
-
-app.Run();
+await app.RunAsync();

@@ -1,10 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!-- Camada de dominio do Order: agregado Order, itens e a maquina de estados. -->
 
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\Marketplace.SharedKernel\Marketplace.SharedKernel.csproj" />
